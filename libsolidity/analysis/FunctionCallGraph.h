@@ -23,6 +23,7 @@
 
 #include <deque>
 #include <memory>
+#include <ostream>
 #include <variant>
 #include <vector>
 
@@ -113,5 +114,7 @@ private:
 	ContractCallGraph m_graph;
 	std::deque<CallableDeclaration const*> m_visitQueue;
 };
+
+std::ostream& operator<<(std::ostream& _out, FunctionCallGraphBuilder::Node const& _node);
 
 }

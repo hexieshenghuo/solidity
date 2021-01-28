@@ -18,6 +18,8 @@
 
 #include <libsolidity/analysis/FunctionCallGraph.h>
 
+#include <range/v3/range/conversion.hpp>
+#include <range/v3/view/join.hpp>
 #include <range/v3/view/reverse.hpp>
 #include <range/v3/view/transform.hpp>
 
@@ -271,4 +273,65 @@ void FunctionCallGraphBuilder::functionReferenced(CallableDeclaration const& _ca
 		add(SpecialNode::InternalDispatch, &_callable);
 
 	enqueueCallable(_callable);
+}
+
+ostream& solidity::frontend::operator<<(ostream& _out, FunctionCallGraphBuilder::Node const& _node)
+{
+	using SpecialNode = FunctionCallGraphBuilder::SpecialNode;
+
+	if (holds_alternative<SpecialNode>(_node))
+	{
+		auto specialNode = get<SpecialNode>(_node);
+		switch (specialNode)
+		{
+			case SpecialNode::InternalDispatch:
+				_out<< "InternalDispatch";
+				break;
+			case SpecialNode::Entry:
+				_out<< "Entry";
+				break;
+			default: solAssert(false, "Invalid SpecialNode type");
+		}
+	}
+	else
+	{
+		auto const* callableDeclaration = get<CallableDeclaration const*>(_node);
+		solAssert(callableDeclaration, "");
+
+		auto const* function = dynamic_cast<FunctionDefinition const *>(callableDeclaration);
+		auto const* event = dynamic_cast<EventDefinition const *>(callableDeclaration);
+		auto const* modifier = dynamic_cast<ModifierDefinition const *>(callableDeclaration);
+
+		auto typeToString = [](auto const& _var) -> string { return _var->type()->toString(true); };
+		vector<string> parameters = callableDeclaration->parameters() | views::transform(typeToString) | to<vector<string>>();
+		string joinedParameters = parameters | views::join(',') | to<string>();
+
+		string scopeName;
+		if (!function || !function->isFree())
+		{
+			solAssert(callableDeclaration->annotation().scope, "");
+			auto const* parentContract = dynamic_cast<ContractDefinition const*>(callableDeclaration->annotation().scope);
+			solAssert(parentContract, "");
+			scopeName = parentContract->name();
+		}
+
+		if (function && function->isFree())
+			_out << "function " << function->name() << "(" << joinedParameters << ")";
+		else if (function && function->isConstructor())
+			_out << "constructor of " << scopeName;
+		else if (function && function->isFallback())
+			_out << "fallback of " << scopeName;
+		else if (function && function->isReceive())
+			_out << "receive of " << scopeName;
+		else if (function)
+			_out << "function " << scopeName << "." << function->name() << "(" << joinedParameters << ")";
+		else if (event)
+			_out<< "event " << scopeName << "." << event->name() << "(" << joinedParameters << ")";
+		else if (modifier)
+			_out<< "modifier " << scopeName << "." << modifier->name();
+		else
+			solAssert(false, "Unexpected AST node type in function call graph");
+	}
+
+	return _out;
 }
