@@ -1,11 +1,13 @@
 # LSP C++ Library
 
-This small library is meant to be general purpose, i.e. not specifically bound to be exclusively
+This small library is meant to be a somewhat general purpose, i.e. not specifically bound to be exclusively
 used by Solidity, but certainly created to provide a language server for Solidity & Yul.
 
-Therefore It should only depend on the standard C++ library, well, and a JSON library :-).
+This library is based on the LSP proposal version 3.16, that can be found at:
 
-## The life of a message
+https://microsoft.github.io/language-server-protocol/specifications/specification-3-16/
+
+### The life of a message
 
 1. The transport layer parses HTTP-alike JSON-RPC messages from stdin (or via an HTTP API).
 2. Those JSON-RPC messages are then translated into high-level LSP message objects.
