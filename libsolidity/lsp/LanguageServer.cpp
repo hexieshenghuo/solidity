@@ -104,9 +104,17 @@ void LanguageServer::changeConfiguration(Json::Value const& _settings)
 
 	if (_settings["remapping"].isArray())
 	{
+		for (auto const& element: _settings["remapping"])
+		{
+			if (element.isString())
+			{
+				if (auto remappingOpt = CompilerStack::parseRemapping(element.asString()); remappingOpt.has_value())
+					m_remappings.emplace_back(move(remappingOpt.value()));
+				else
+					trace("Failed to parse remapping: '"s + element.asString() + "'");
+			}
+		}
 	}
-
-	// TODO: remappings
 }
 
 void LanguageServer::initialized()
@@ -244,6 +252,7 @@ void LanguageServer::compile(::lsp::vfs::File const& _file)
 	m_compilerStack->setParserErrorRecovery(false);
 	m_compilerStack->setRevertStringBehaviour(RevertStrings::Default); // TODO get from config
 	m_compilerStack->setSources(m_sourceCodes);
+	m_compilerStack->setRemappings(m_remappings);
 
 	m_compilerStack->setEVMVersion(m_evmVersion);
 

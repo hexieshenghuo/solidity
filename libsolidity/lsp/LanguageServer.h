@@ -123,13 +123,17 @@ private:
 		findAllReferences(_declaration, _declaration->name(), _sourceUnit, _sourceUnitUri, _output);
 	}
 
-private:
 	/// In-memory filesystem for each opened file.
-	///
 	/// Closed files will not be removed as they may be needed for compiling.
 	::lsp::vfs::VFS m_vfs;
 
 	std::unique_ptr<FileReader> m_fileReader;
+
+	/// List of directories a file may be read from.
+	std::vector<boost::filesystem::path> m_allowedDirectories;
+
+	/// Workspace root directory
+	boost::filesystem::path m_basePath;
 
 	/// map of input files to source code strings
 	std::map<std::string, std::string> m_sourceCodes;
@@ -138,12 +142,7 @@ private:
 	std::map<std::string /*URI*/, std::vector<::lsp::PublishDiagnostics>> m_diagnostics;
 
 	std::unique_ptr<frontend::CompilerStack> m_compilerStack;
-
-	/// Allowed directories
-	std::vector<boost::filesystem::path> m_allowedDirectories;
-
-	/// Workspace root directory
-	boost::filesystem::path m_basePath;
+	std::vector<frontend::CompilerStack::Remapping> m_remappings;
 
 	/// Configured EVM version that is being used in compilations.
 	langutil::EVMVersion m_evmVersion = langutil::EVMVersion::berlin();
