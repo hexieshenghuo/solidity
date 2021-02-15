@@ -60,6 +60,8 @@
 #include <libsolutil/CommonIO.h>
 #include <libsolutil/JSON.h>
 
+#include <range/v3/all.hpp>
+
 #include <algorithm>
 #include <memory>
 
@@ -1121,19 +1123,26 @@ General Information)").c_str(),
 	if (!checkMutuallyExclusive(m_args, g_argColor, g_argNoColor))
 		return false;
 
-	static vector<string> const conflictingWithLSP{
-		// TODO: I think there are much more (almost all) options that should not added when --lsp is present.
-		g_argBasePath,
-		g_argStandardJSON,
-		g_argLink,
-		g_argAssemble,
-		g_argYul,
-		g_argStrictAssembly,
-		g_argImportAst
+	static vector<string> const allowedWithLSP{
+		// LSP related arguments.
+		"lsp",
+		"lsp-port",
+		// Defaulted arguments must be listed.
+		g_argModelCheckerEngine,
+		g_argModelCheckerTargets,
+		g_argOptimizeRuns
 	};
-	for (auto const& optionB: conflictingWithLSP)
-		if (!checkMutuallyExclusive(m_args, "lsp", optionB))
-			return false;
+
+	if (m_args.count("lsp"))
+		for (auto const& arg: m_args)
+		{
+			sout() << "arg: " << arg.first << '\n';
+			if (ranges::none_of(allowedWithLSP, [&](auto const& a) -> bool { return a == arg.first; }))
+			{
+				serr() << "Option " << arg.first << " and " << "lsp" << " are mutually exclusive." << endl;
+				return false;
+			}
+		}
 
 	static vector<string> const conflictingWithStopAfter{
 		g_argBinary,
