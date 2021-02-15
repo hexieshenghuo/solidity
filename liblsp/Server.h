@@ -103,7 +103,7 @@ struct Diagnostic {
 struct PublishDiagnostics {
 	std::string uri;                           // The URI for which diagnostic information is reported.
 	std::optional<int> version = std::nullopt; // Optional the version number of the document the diagnostics are published for.
-	std::vector<Diagnostic> diagnostics = {}   // An array of diagnostic information items.
+	std::vector<Diagnostic> diagnostics = {};  // An array of diagnostic information items.
 };
 // }}}
 
@@ -145,8 +145,8 @@ public:
 	/// The client requested a shutdown (without terminating). Only `Exit` event is valid after this.
 	virtual void shutdown() = 0;
 
-	using SettingsMaps = std::map<std::string, std::string>;
-	virtual void changeConfiguration(SettingsMaps const&) {}
+	/// Invoked when the server user-supplied configuration changes (initiated by the client).
+	virtual void changeConfiguration(Json::Value const&) {}
 
 	/// The given document was opened.
 	///

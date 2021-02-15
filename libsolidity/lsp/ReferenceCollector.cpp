@@ -37,9 +37,6 @@ ReferenceCollector::ReferenceCollector(
 	m_declaration{_declaration},
 	m_sourceIdentifierName{_sourceIdentifierName.empty() ? _declaration.name() : _sourceIdentifierName}
 {
-	fprintf(stderr, "ReferenceCollector.ctor: decl.name='%s', source='%s'\n",
-			_declaration.name().c_str(),
-			_declaration.location().text().c_str());
 }
 
 std::vector<::lsp::DocumentHighlight> ReferenceCollector::collect(
@@ -56,66 +53,60 @@ std::vector<::lsp::DocumentHighlight> ReferenceCollector::collect(
 bool ReferenceCollector::visit(frontend::ImportDirective const& _import)
 {
 	for (auto const& symbolAlias: _import.symbolAliases())
-	{
-		fprintf(stderr, "ReferenceCollector.ImportDirective.UnitAlias: name=%s\n",
-				symbolAlias.alias->c_str());
 		if (m_sourceIdentifierName == *symbolAlias.alias)
 		{
 			addReference(symbolAlias.location);
 			return true;
 		}
-	}
+
 	return visitNode(_import);
+}
+
+bool ReferenceCollector::tryAddReference(frontend::Declaration const* _declaration, solidity::langutil::SourceLocation const& _location)
+{
+	if (&m_declaration != _declaration)
+		return false;
+
+	addReference(_location);
+	return true;
 }
 
 bool ReferenceCollector::visit(frontend::Identifier const& _identifier)
 {
-	// TODO: also check for candidateDeclarations and overloadedDeclarations.
-	auto ref = _identifier.annotation().referencedDeclaration;
-	fprintf(stderr, "ReferenceCollector.visit(Identifier): %s (%s)\n",
-			_identifier.name().c_str(),
-			_identifier.annotation().referencedDeclaration
-				? typeid(*ref).name()
-				: "no type");
+	if (auto const* declaration = _identifier.annotation().referencedDeclaration)
+		tryAddReference(declaration, _identifier.location());
 
-	if (auto const declaration = _identifier.annotation().referencedDeclaration; declaration)
-		if (declaration == &m_declaration)
-			addReference(_identifier.location(), "(identifier)");
+	for (auto const* declaration: _identifier.annotation().candidateDeclarations)
+		tryAddReference(declaration, _identifier.location());
+
+	for (auto const* declaration: _identifier.annotation().overloadedDeclarations)
+		tryAddReference(declaration, _identifier.location());
 
 	return visitNode(_identifier);
 }
 
 bool ReferenceCollector::visit(frontend::MemberAccess const& _memberAccess)
 {
-	// TODO: MemberAccess.annotation.referencedDeclaration is always NULL, why?
-	// It should be EnumValue for an enum value.
-	fprintf(stderr, "ReferenceCollector.MemberAccess(%s): %s\n", // XXX referencedDeclaration==NULL
-			_memberAccess.annotation().referencedDeclaration
-				? _memberAccess.annotation().referencedDeclaration->name().c_str()
-				: "null",
-			_memberAccess.memberName().c_str());
-
 	if (_memberAccess.annotation().referencedDeclaration == &m_declaration)
-		addReference(_memberAccess.location(), "memberAccess("s + _memberAccess.memberName() + ")"s);
+		addReference(_memberAccess.location());
 
 	return visitNode(_memberAccess);
 }
 
 bool ReferenceCollector::visitNode(frontend::ASTNode const& _node)
 {
-	fprintf(stderr, "ReferenceCollector.visitNode: %s\n", typeid(_node).name());
 	if (&_node == &m_declaration)
 	{
 		if (auto const* decl = dynamic_cast<Declaration const*>(&_node))
-			addReference(decl->nameLocation(), "(visitNode)");
+			addReference(decl->nameLocation());
 		else
-			addReference(_node.location(), "(visitNode)");
+			addReference(_node.location());
 	}
 
 	return true;
 }
 
-void ReferenceCollector::addReference(solidity::langutil::SourceLocation const& _location, std::string msg)
+void ReferenceCollector::addReference(solidity::langutil::SourceLocation const& _location)
 {
 	auto const [startLine, startColumn] = _location.source->translatePositionToLineColumn(_location.start);
 	auto const [endLine, endColumn] = _location.source->translatePositionToLineColumn(_location.end);
@@ -123,12 +114,6 @@ void ReferenceCollector::addReference(solidity::langutil::SourceLocation const& 
 		{startLine, startColumn},
 		{endLine, endColumn}
 	};
-
-	fprintf(stderr, " -> found reference %s at %d:%d .. %d:%d\n",
-		msg.c_str(),
-		startLine, startColumn,
-		endLine, endColumn
-	);
 
 	m_result.emplace_back(::lsp::DocumentHighlight{move(locationRange), ::lsp::DocumentHighlightKind::Text});
 }

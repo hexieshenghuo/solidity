@@ -96,12 +96,17 @@ void LanguageServer::shutdown()
 	return {"solc", string(solidity::frontend::VersionNumber)};
 }
 
-void LanguageServer::changeConfiguration(SettingsMaps const& _settings)
+void LanguageServer::changeConfiguration(Json::Value const& _settings)
 {
-	if (auto const i = _settings.find("evm"); i != _settings.end())
-		if (auto const evmVersionOpt = EVMVersion::fromString(i->second); evmVersionOpt.has_value())
+	if (_settings["evm"].isString())
+		if (auto const evmVersionOpt = EVMVersion::fromString(_settings["evm"].asString()); evmVersionOpt.has_value())
 			m_evmVersion = evmVersionOpt.value();
 
+	if (_settings["remapping"].isArray())
+	{
+	}
+
+	// TODO: remappings
 }
 
 void LanguageServer::initialized()

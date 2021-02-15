@@ -59,7 +59,7 @@ public:
 	::lsp::ServerId initialize(std::string _rootUri, std::vector<::lsp::WorkspaceFolder> _workspaceFolders) override;
 	void initialized() override;
 	void shutdown() override;
-	void changeConfiguration(SettingsMaps const&) override;
+	void changeConfiguration(Json::Value const&) override;
 	void documentOpened(std::string const& _uri, std::string _languageId, int _documentVersion, std::string _contents) override;
 	void documentContentUpdated(std::string const& _uri, std::optional<int> _documentVersion, std::string const& _fullContentChange) override;
 	void documentContentUpdated(std::string const& _uri, std::optional<int> _version, ::lsp::Range _range, std::string const& _text) override;

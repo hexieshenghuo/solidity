@@ -48,7 +48,8 @@ public:
 	bool visitNode(frontend::ASTNode const& _node) override;
 
 private:
-	void addReference(solidity::langutil::SourceLocation const& _location, std::string msg = "");
+	bool tryAddReference(frontend::Declaration const* _declaration, solidity::langutil::SourceLocation const& _location);
+	void addReference(solidity::langutil::SourceLocation const& _location);
 };
 
 } // end namespace
