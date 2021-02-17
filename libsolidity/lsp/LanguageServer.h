@@ -73,7 +73,6 @@ public:
 	///
 	/// update diagnostics and also pushes any updates to the client.
 	void validateAll();
-	void validate(::lsp::vfs::File const& _file, std::vector<::lsp::PublishDiagnostics>& _result);
 	void validate(::lsp::vfs::File const& _file);
 
 private:
@@ -137,9 +136,6 @@ private:
 
 	/// map of input files to source code strings
 	std::map<std::string, std::string> m_sourceCodes;
-
-	/// Mapping between VFS file and its diagnostics.
-	std::map<std::string /*URI*/, std::vector<::lsp::PublishDiagnostics>> m_diagnostics;
 
 	std::unique_ptr<frontend::CompilerStack> m_compilerStack;
 	std::vector<frontend::CompilerStack::Remapping> m_remappings;

@@ -198,15 +198,6 @@ void LanguageServer::validateAll()
 		validate(file.get());
 }
 
-void LanguageServer::validate(::lsp::vfs::File const& _file)
-{
-	vector<::lsp::PublishDiagnostics> result;
-	validate(_file, result);
-
-	for (auto const& diag: result)
-		pushDiagnostics(diag);
-}
-
 frontend::ReadCallback::Result LanguageServer::readFile(string const& _kind, string const& _path)
 {
 	return m_fileReader->readFile(_kind, _path);
@@ -261,12 +252,11 @@ void LanguageServer::compile(::lsp::vfs::File const& _file)
 	m_compilerStack->compile();
 }
 
-void LanguageServer::validate(::lsp::vfs::File const& _file, vector<::lsp::PublishDiagnostics>& _result)
+void LanguageServer::validate(::lsp::vfs::File const& _file)
 {
 	compile(_file);
 
-	::lsp::PublishDiagnostics params{};
-	params.uri = _file.uri();
+	std::vector<::lsp::Diagnostic> collectedDiagnostics{};
 
 	for (shared_ptr<Error const> const& error: m_compilerStack->errors())
 	{
@@ -316,37 +306,10 @@ void LanguageServer::validate(::lsp::vfs::File const& _file, vector<::lsp::Publi
 		if (message.errorId.has_value())
 			diag.code = message.errorId.value().error;
 
-		params.diagnostics.emplace_back(move(diag));
+		collectedDiagnostics.emplace_back(move(diag));
 	}
-
-	// Personally, I think they should stay, because it is nice to get reports on these.
-	// We could make these diagnostics optional or even part of solc compiler itself.
-	// (Currently this only checks the whole file, but it should instead just look at comments)
-#if 1
-	for (size_t pos = _file.contentString().find("FIXME", 0); pos != string::npos; pos = _file.contentString().find("FIXME", pos + 1))
-	{
-		::lsp::Diagnostic diag{};
-		diag.message = "Hello, FIXME's should be fixed.";
-		diag.range.start = _file.buffer().toPosition(pos);
-		diag.range.end = {diag.range.start.line, diag.range.start.column + 5};
-		diag.severity = ::lsp::DiagnosticSeverity::Error;
-		diag.source = "solc";
-		params.diagnostics.emplace_back(diag);
-	}
-
-	for (size_t pos = _file.contentString().find("TODO", 0); pos != string::npos; pos = _file.contentString().find("FIXME", pos + 1))
-	{
-		::lsp::Diagnostic diag{};
-		diag.message = "Please remember to create a ticket on GitHub for that.";
-		diag.range.start = _file.buffer().toPosition(pos);
-		diag.range.end = {diag.range.start.line, diag.range.start.column + 5};
-		diag.severity = ::lsp::DiagnosticSeverity::Hint;
-		diag.source = "solc";
-		params.diagnostics.emplace_back(diag);
-	}
-#endif
-
-	_result.emplace_back(params);
+	optional<int> version = nullopt; // TODO: do we need this? (AFAIK that's been the file version this diagnostics belongs to)
+	pushDiagnostics(_file.uri(), version, collectedDiagnostics);
 }
 
 frontend::ASTNode const* LanguageServer::findASTNode(::lsp::Position const& _position, std::string const& _fileName)

@@ -1136,7 +1136,6 @@ General Information)").c_str(),
 	if (m_args.count("lsp"))
 		for (auto const& arg: m_args)
 		{
-			sout() << "arg: " << arg.first << '\n';
 			if (ranges::none_of(allowedWithLSP, [&](auto const& a) -> bool { return a == arg.first; }))
 			{
 				serr() << "Option " << arg.first << " and " << "lsp" << " are mutually exclusive." << endl;

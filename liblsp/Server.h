@@ -66,7 +66,7 @@ struct Location {
 
 struct DocumentHighlight {
 	Range range;
-	DocumentHighlightKind kind;
+	DocumentHighlightKind kind = DocumentHighlightKind::Unspecified;
 };
 
 enum class DiagnosticSeverity {
@@ -99,15 +99,12 @@ struct Diagnostic {
 	std::vector<DiagnosticTag> diagnosticTag;      // Additional metadata about the diagnostic.
 	std::vector<DiagnosticRelatedInformation> relatedInformation; // An array of related diagnostic information, e.g. when symbol-names within a scope collide all definitions can be marked via this property.
 };
-
-struct PublishDiagnostics {
-	std::string uri;                           // The URI for which diagnostic information is reported.
-	std::optional<int> version = std::nullopt; // Optional the version number of the document the diagnostics are published for.
-	std::vector<Diagnostic> diagnostics = {};  // An array of diagnostic information items.
-};
 // }}}
 
 /// Solidity Language Server, managing one LSP client.
+///
+/// This implements a subset of LSP version 3.16 that can be found at:
+///     https://microsoft.github.io/language-server-protocol/specifications/specification-3-16/
 class Server
 {
 private:
@@ -123,7 +120,7 @@ public:
 
 	virtual ~Server() = default;
 
-	/// Loops over incoming messages via the transport layer until shutdown condition is meat.
+	/// Loops over incoming messages via the transport layer until shutdown condition is met.
 	///
 	/// The standard shutdown condition is when the maximum number of consecutive failures
 	/// has been exceeded.
@@ -131,8 +128,10 @@ public:
 	/// @return boolean indicating normal or abnormal termination.
 	bool run();
 
-	/// Handles a raw client message
+	/// Handles a JSON-RPC message in string form.
 	void handleMessage(std::string const& _message);
+
+	/// Handles a JSON-RPC message.
 	void handleMessage(Json::Value const& _jsonMessage);
 
 	// {{{ Client-to-Server API
@@ -212,7 +211,6 @@ public:
 		std::optional<int> _version,
 		std::vector<Diagnostic> const& _diagnostics
 	);
-	void pushDiagnostics(PublishDiagnostics const& _diagnostics);
 
 	/// Sends a message to the client.
 	///
@@ -220,18 +218,16 @@ public:
 	/// @param _message the message to send to the client
 	void error(MessageId const& _id, ErrorCode, std::string const& _message);
 
-	/// Logs a message.
+	/// Logs a message (should be used for logging messages that are informationally useful to the client).
 	void log(std::string const& _message);
-	/// Logs a verbose message.
+
+	/// Logs a verbose trace message (should used for logging messages that are helpful to the client).
 	void trace(std::string const& _message);
 
+	/// Retrieves the trace-level as configured by the client.
 	Trace trace() const noexcept { return m_trace; }
-	void setTrace(Trace _trace) { m_trace = _trace; }
 
 protected:
-	Transport& client() noexcept { return m_client; }
-
-	void handle_cancelRequest(MessageId _id, Json::Value const& _args);
 	void handle_initializeRequest(MessageId _id, Json::Value const& _args);
 	void handle_exit(MessageId _id, Json::Value const& _args);
 	void handle_workspace_didChangeConfiguration(MessageId _id, Json::Value const& _args);
@@ -241,7 +237,6 @@ protected:
 	void handle_textDocument_definition(MessageId _id, Json::Value const& _args);
 	void handle_textDocument_highlight(MessageId _id, Json::Value const& _args);
 	void handle_textDocument_references(MessageId _id, Json::Value const& _args);
-	void invalidRequest(MessageId _id, std::string const& _methodName);
 
 private:
 	using Handler = std::function<void(MessageId, Json::Value const&)>;

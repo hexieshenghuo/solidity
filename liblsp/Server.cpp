@@ -31,6 +31,26 @@ using namespace std::string_literals;
 
 namespace lsp {
 
+namespace
+{
+	void loadTextDocumentPosition(DocumentPosition& _params, Json::Value const& _json)
+	{
+		_params.uri = _json["textDocument"]["uri"].asString();
+		_params.position.line = _json["position"]["line"].asInt();
+		_params.position.column = _json["position"]["character"].asInt();
+	}
+
+	Json::Value toJson(Range const& _range)
+	{
+		Json::Value json;
+		json["start"]["line"] = _range.start.line;
+		json["start"]["character"] = _range.start.column;
+		json["end"]["line"] = _range.end.line;
+		json["end"]["character"] = _range.end.column;
+		return json;
+	}
+}
+
 // LSP specification can be found at:
 //
 // https://microsoft.github.io/language-server-protocol/specifications/specification-current/
@@ -38,7 +58,7 @@ namespace lsp {
 Server::Server(Transport& _client, std::function<void(std::string_view)> _logger):
 	m_client{_client},
 	m_handlers{
-		{"cancelRequest", bind(&Server::handle_cancelRequest, this, _1, _2)},
+		{"cancelRequest", [](auto, auto) {/*don't do anything for now, as we're synchronous*/}},
 		{"initialize", bind(&Server::handle_initializeRequest, this, _1, _2)},
 		{"initialized", [this](auto, auto) { initialized(); }},
 		{"shutdown", [this](auto, auto) { m_shutdownRequested = true; }},
@@ -83,12 +103,6 @@ bool Server::run()
 		return true;
 	else
 		return false;
-}
-
-void Server::invalidRequest(MessageId _id, string const& _methodName)
-{
-	// The LSP specification requires an invalid request to be respond with an InvalidRequest error response.
-	error(_id, ErrorCode::InvalidRequest, "Invalid request " + _methodName);
 }
 
 void Server::handleMessage(Json::Value const& _jsonMessage)
@@ -187,11 +201,6 @@ void Server::handle_exit(MessageId _id, Json::Value const& /*_args*/)
 	m_client.reply(_id, replyArgs);
 }
 
-void Server::handle_cancelRequest(MessageId, Json::Value const&)
-{
-	// for now we don't do anything because we're synchronous.
-}
-
 void Server::handle_textDocument_didOpen(MessageId /*_id*/, Json::Value const& _args)
 {
 	// decoding
@@ -208,22 +217,26 @@ void Server::handle_textDocument_didOpen(MessageId /*_id*/, Json::Value const& _
 	// no encoding
 }
 
-void Server::handle_textDocument_didChange(MessageId _id, Json::Value const& _args)
+void Server::handle_textDocument_didChange(MessageId /*_id*/, Json::Value const& _args)
 {
 	auto const version = _args["textDocument"]["version"].asInt();
 	auto const uri = _args["textDocument"]["uri"].asString();
 
-	// TODO: in the longer run, even move the VFS handling in here, as content updates are always
-	// equivalent regardless of actual lsp implementation.?
+	// TODO: in the longer run, I'd like to try moving the VFS handling into Server class, so
+	// the specific Solidity LSP implementation doesn't need to care about that.
 
 	auto const contentChanges = _args["contentChanges"];
 	for (Json::Value jsonContentChange: contentChanges)
 	{
-		if (jsonContentChange.isObject() && jsonContentChange["range"])
+		if (!jsonContentChange.isObject())
+			// Protocol error, will only happen on broken clients, so silently ignore it.
+			continue;
+
+		auto const text = jsonContentChange["text"].asString();
+
+		if (jsonContentChange["range"].isObject())
 		{
 			Json::Value jsonRange = jsonContentChange["range"];
-
-			auto const text = jsonContentChange["text"].asString();
 			Range range{};
 			range.start.line = jsonRange["start"]["line"].asInt();
 			range.start.column = jsonRange["start"]["character"].asInt();
@@ -234,8 +247,8 @@ void Server::handle_textDocument_didChange(MessageId _id, Json::Value const& _ar
 		}
 		else
 		{
-			// TODO: TextDocumentFullContentChangeEvent fullChange;
-			invalidRequest(_id, "TODO: full content update");
+			// full content update
+			documentContentUpdated(uri, version, text);
 		}
 	}
 
@@ -247,26 +260,6 @@ void Server::handle_textDocument_didClose(MessageId /*_id*/, Json::Value const& 
 {
 	auto const uri = _args["textDocument"]["uri"].asString();
 	documentClosed(uri);
-}
-
-namespace
-{
-	void loadTextDocumentPosition(DocumentPosition& _params, Json::Value const& _json)
-	{
-		_params.uri = _json["textDocument"]["uri"].asString();
-		_params.position.line = _json["position"]["line"].asInt();
-		_params.position.column = _json["position"]["character"].asInt();
-	}
-
-	Json::Value toJson(Range const& _range)
-	{
-		Json::Value json;
-		json["start"]["line"] = _range.start.line;
-		json["start"]["character"] = _range.start.column;
-		json["end"]["line"] = _range.end.line;
-		json["end"]["character"] = _range.end.column;
-		return json;
-	}
 }
 
 void Server::handle_textDocument_definition(MessageId _id, Json::Value const& _args)
@@ -365,11 +358,6 @@ void Server::trace(string const& _message)
 
 	if (m_logger)
 		m_logger(_message);
-}
-
-void Server::pushDiagnostics(PublishDiagnostics const& _diagnostics)
-{
-	pushDiagnostics(_diagnostics.uri, _diagnostics.version, _diagnostics.diagnostics);
 }
 
 void Server::pushDiagnostics(string const& _uri, optional<int> _version, vector<Diagnostic> const& _diagnostics)
