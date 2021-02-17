@@ -37,7 +37,7 @@ public:
 	std::vector<::lsp::DocumentHighlight> take() { return std::move(m_result); }
 
 	static std::vector<::lsp::DocumentHighlight> collect(
-		frontend::Declaration const& _declaration,
+		frontend::Declaration const* _declaration,
 		frontend::ASTNode const& _ast,
 		std::string const& _sourceIdentifierName = {}
 	);

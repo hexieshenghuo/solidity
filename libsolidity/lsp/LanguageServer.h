@@ -22,6 +22,7 @@
 
 #include <libsolidity/interface/CompilerStack.h>
 #include <libsolidity/interface/FileReader.h>
+#include <libsolidity/lsp/ReferenceCollector.h>
 #include <libsolidity/ast/AST.h>
 
 #include <json/value.h>
@@ -83,23 +84,6 @@ private:
 
 	std::optional<::lsp::Location> declarationPosition(frontend::Declaration const* _declaration);
 
-	std::vector<::lsp::DocumentHighlight> findAllReferences(
-		frontend::Declaration const* _declaration,
-		std::string const& _sourceIdentifierNam,
-		frontend::SourceUnit const& _sourceUnit
-	);
-
-	std::vector<::lsp::DocumentHighlight> findAllReferences(
-		frontend::Declaration const* _declaration,
-		frontend::SourceUnit const& _sourceUnit
-	)
-	{
-		if (_declaration)
-			return findAllReferences(_declaration, _declaration->name(), _sourceUnit);
-		else
-			return {};
-	}
-
 	void findAllReferences(
 		frontend::Declaration const* _declaration,
 		std::string const& _sourceIdentifierName,
@@ -107,19 +91,6 @@ private:
 		std::string const& _sourceUnitPath,
 		std::vector<::lsp::Location>& _output
 	);
-
-	void findAllReferences(
-		frontend::Declaration const* _declaration,
-		frontend::SourceUnit const& _sourceUnit,
-		std::string const& _sourceUnitPath,
-		std::vector<::lsp::Location>& _output
-	)
-	{
-		if (!_declaration)
-			return;
-
-		findAllReferences(_declaration, _declaration->name(), _sourceUnit, _sourceUnitPath, _output);
-	}
 
 	/// In-memory filesystem for each opened file.
 	/// Closed files will not be removed as they may be needed for compiling.

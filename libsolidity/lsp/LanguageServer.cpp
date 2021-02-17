@@ -330,10 +330,7 @@ std::vector<::lsp::Location> LanguageServer::gotoDefinition(::lsp::DocumentPosit
 {
 	auto const file = m_vfs.find(_location.path);
 	if (!file)
-	{
-		// error(_params.requestId, ErrorCode::InvalidRequest, "File not found in VFS.");
 		return {};
-	}
 
 	// source should be compiled already
 	solAssert(m_compilerStack.get() != nullptr, "");
@@ -341,10 +338,7 @@ std::vector<::lsp::Location> LanguageServer::gotoDefinition(::lsp::DocumentPosit
 	auto const sourceName = file->path();
 	auto const sourceNode = findASTNode(_location.position, sourceName);
 	if (!sourceNode)
-	{
-		trace("Could not infer AST node from given source location.");
-		return {};
-	}
+		return {}; // Could not infer AST node from given source location.
 
 	if (auto const importDirective = dynamic_cast<ImportDirective const*>(sourceNode))
 	{
@@ -421,21 +415,6 @@ optional<::lsp::Location> LanguageServer::declarationPosition(frontend::Declarat
 	return output;
 }
 
-std::vector<::lsp::DocumentHighlight> LanguageServer::findAllReferences(
-	frontend::Declaration const* _declaration,
-	string const& _sourceIdentifierName,
-	SourceUnit const& _sourceUnit
-)
-{
-	if (!_declaration)
-		return {};
-
-	// The SourceUnit should be the root scope unless we're looking for simple variable identifier.
-
-	// TODO if vardecl, just use decl's scope (for lower overhead).
-	return ReferenceCollector::collect(*_declaration, _sourceUnit, _sourceIdentifierName);
-}
-
 void LanguageServer::findAllReferences(
 	frontend::Declaration const* _declaration,
 	string const& _sourceIdentifierName,
@@ -444,7 +423,7 @@ void LanguageServer::findAllReferences(
 	std::vector<::lsp::Location>& _output
 )
 {
-	for (auto const& highlight: findAllReferences(_declaration, _sourceIdentifierName, _sourceUnit))
+	for (auto const& highlight: ReferenceCollector::collect(_declaration, _sourceUnit, _sourceIdentifierName))
 	{
 		auto location = ::lsp::Location{};
 		location.range = highlight.range;
@@ -490,24 +469,27 @@ vector<::lsp::Location> LanguageServer::references(::lsp::DocumentPosition _docu
 		frontend::SourceUnit const& sourceUnit = m_compilerStack->ast(sourceName);
 
 		if (auto decl = sourceIdentifier->annotation().referencedDeclaration)
-			findAllReferences(decl, sourceUnit, _documentPosition.path, output);
+			findAllReferences(decl, decl->name(), sourceUnit, _documentPosition.path, output);
 		else
 			trace("references: referencedDeclaration == NULL");
 
 		for (auto const decl: sourceIdentifier->annotation().candidateDeclarations)
-			findAllReferences(decl, sourceUnit, _documentPosition.path, output);
+			findAllReferences(decl, decl->name(), sourceUnit, _documentPosition.path, output);
 	}
-	else if (auto const varDecl = dynamic_cast<VariableDeclaration const*>(sourceNode))
+	else if (auto const decl = dynamic_cast<VariableDeclaration const*>(sourceNode))
 	{
 		auto const sourceName = _documentPosition.path;
 		frontend::SourceUnit const& sourceUnit = m_compilerStack->ast(sourceName);
-		findAllReferences(varDecl, sourceUnit, _documentPosition.path, output);
+		findAllReferences(decl, decl->name(), sourceUnit, _documentPosition.path, output);
 	}
 	else if (auto const memberAccess = dynamic_cast<MemberAccess const*>(sourceNode))
 	{
-		auto const sourceName = _documentPosition.path;
-		frontend::SourceUnit const& sourceUnit = m_compilerStack->ast(sourceName);
-		findAllReferences(varDecl, sourceUnit, _documentPosition.path, output);
+		if (Declaration const* decl = memberAccess->annotation().referencedDeclaration)
+		{
+			auto const sourceName = _documentPosition.path;
+			frontend::SourceUnit const& sourceUnit = m_compilerStack->ast(sourceName);
+			findAllReferences(decl, memberAccess->memberName(), sourceUnit, _documentPosition.path, output);
+		}
 	}
 	else
 		trace("references: not an identifier");
@@ -554,13 +536,13 @@ vector<::lsp::DocumentHighlight> LanguageServer::semanticHighlight(::lsp::Docume
 		vector<::lsp::DocumentHighlight> output;
 
 		if (sourceIdentifier->annotation().referencedDeclaration)
-			output += findAllReferences(sourceIdentifier->annotation().referencedDeclaration, sourceIdentifier->name(), sourceUnit);
+			output += ReferenceCollector::collect(sourceIdentifier->annotation().referencedDeclaration, sourceUnit, sourceIdentifier->name());
 
 		for (Declaration const* declaration: sourceIdentifier->annotation().candidateDeclarations)
-			output += findAllReferences(declaration, sourceIdentifier->name(), sourceUnit);
+			output += ReferenceCollector::collect(declaration, sourceUnit, sourceIdentifier->name());
 
 		for (Declaration const* declaration: sourceIdentifier->annotation().overloadedDeclarations)
-			output += findAllReferences(declaration, sourceIdentifier->name(), sourceUnit);
+			output += ReferenceCollector::collect(declaration, sourceUnit, sourceIdentifier->name());
 
 		return output;
 	}
@@ -568,7 +550,7 @@ vector<::lsp::DocumentHighlight> LanguageServer::semanticHighlight(::lsp::Docume
 	{
 		auto const sourceName = _documentPosition.path;
 		frontend::SourceUnit const& sourceUnit = m_compilerStack->ast(sourceName);
-		output = findAllReferences(varDecl, sourceUnit);
+		output = ReferenceCollector::collect(varDecl, sourceUnit, varDecl->name());
 	}
 	else if (auto const* memberAccess = dynamic_cast<MemberAccess const*>(sourceNode))
 	{
@@ -589,7 +571,7 @@ vector<::lsp::DocumentHighlight> LanguageServer::semanticHighlight(::lsp::Docume
 				// find the definition
 				for (auto const& enumMember: enumMembers)
 					if (enumMember->name() == memberName)
-						output += findAllReferences(enumMember.get(), sourceUnit);
+						output += ReferenceCollector::collect(enumMember.get(), sourceUnit, enumMember->name());
 
 				// find uses of the enum value
 			}

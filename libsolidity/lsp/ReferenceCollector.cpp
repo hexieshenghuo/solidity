@@ -40,12 +40,16 @@ ReferenceCollector::ReferenceCollector(
 }
 
 std::vector<::lsp::DocumentHighlight> ReferenceCollector::collect(
-	frontend::Declaration const& _declaration,
+	frontend::Declaration const* _declaration,
 	frontend::ASTNode const& _ast,
 	std::string const& _sourceIdentifierName
 )
 {
-	auto collector = ReferenceCollector(_declaration, _sourceIdentifierName);
+	if (!_declaration)
+		return {};
+
+	// TODO if vardecl, just use decl's scope (for lower overhead).
+	auto collector = ReferenceCollector(*_declaration, _sourceIdentifierName);
 	_ast.accept(collector);
 	return collector.take();
 }
