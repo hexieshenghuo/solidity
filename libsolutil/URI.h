@@ -39,4 +39,6 @@ struct URI
 	std::string fragment;
 };
 
+std::string to_string(URI const& _uri);
+
 }

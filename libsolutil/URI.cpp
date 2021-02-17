@@ -19,6 +19,7 @@
 #include <libsolutil/URI.h>
 
 #include <array>
+#include <sstream>
 #include <string>
 #include <string_view>
 
@@ -175,6 +176,24 @@ optional<URI> URI::parse(std::string_view _uri)
 		return uri;
 	else
 		return nullopt;
+}
+
+string to_string(URI const& _uri)
+{
+	std::stringstream output;
+	output << _uri.scheme;
+	if (!_uri.user.empty())
+		output << _uri.user << '@';
+	output << _uri.host;
+	if (_uri.port != 0)
+		output << ':' << _uri.port;
+	output << _uri.path;
+	if (!_uri.query.empty())
+		output << '?' << _uri.query;
+	if (!_uri.fragment.empty())
+		output << '#' << _uri.fragment;
+
+	return output.str();
 }
 
 }
