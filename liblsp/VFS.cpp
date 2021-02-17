@@ -21,15 +21,13 @@
 #include <deque>
 #include <sstream>
 
-using solidity::util::URI;
-
 using namespace std;
 
 namespace std
 {
 	ostream& operator<<(ostream& _os, lsp::vfs::File const& _file)
 	{
-		_os << '"' << to_string(_file.uri()) << "\": {languageId: " << _file.languageId();
+		_os << '"' << _file.path() << "\": {languageId: " << _file.languageId();
 		_os << ", version: " << _file.version();
 		_os << ", text: \"";
 		for (auto const ch: _file.contentString())
@@ -63,8 +61,8 @@ namespace std
 namespace lsp::vfs
 {
 
-File::File(URI _uri, string _languageId, int _version, string _text):
-	m_uri{ move(_uri) },
+File::File(string _path, string _languageId, int _version, string _text):
+	m_path{ move(_path) },
 	m_languageId{ move(_languageId) },
 	m_version{ _version },
 	m_buffer{ move(_text) }
@@ -108,33 +106,33 @@ void File::replace(std::string const& _replacementText)
 	m_buffer.assign(_replacementText);
 }
 
-File& VFS::insert(URI _uri, std::string _languageId, int _version, string _text)
+File& VFS::insert(string _path, std::string _languageId, int _version, string _text)
 {
-	if (auto i = m_files.find(to_string(_uri)); i != end(m_files))
-		return i->second = vfs::File(move(_uri), move(_languageId), _version, move(_text));
+	if (auto i = m_files.find(_path); i != end(m_files))
+		return i->second = vfs::File(move(_path), move(_languageId), _version, move(_text));
 	else
-		return m_files.emplace(pair{to_string(_uri), File{_uri, move(_languageId), _version, move(_text)}}).first->second;
+		return m_files.emplace(pair{_path, File{_path, move(_languageId), _version, move(_text)}}).first->second;
 }
 
-File const* VFS::find(URI const& _uri) const noexcept
+File const* VFS::find(string const& _path) const noexcept
 {
-	if (auto i = m_files.find(to_string(_uri)); i != end(m_files))
+	if (auto i = m_files.find(_path); i != end(m_files))
 		return &i->second;
 	else
 		return nullptr;
 }
 
-File* VFS::find(URI const& _uri) noexcept
+File* VFS::find(string const& _path) noexcept
 {
-	if (auto i = m_files.find(to_string(_uri)); i != end(m_files))
+	if (auto i = m_files.find(_path); i != end(m_files))
 		return &i->second;
 	else
 		return nullptr;
 }
 
-void VFS::remove(URI const& _uri)
+void VFS::remove(string const& _path)
 {
-	if (auto i = m_files.find(to_string(_uri)); i != end(m_files))
+	if (auto i = m_files.find(_path); i != end(m_files))
 		m_files.erase(i);
 }
 

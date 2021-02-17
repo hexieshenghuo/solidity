@@ -17,8 +17,6 @@
 // SPDX-License-Identifier: GPL-3.0
 #pragma once
 
-#include <libsolutil/URI.h>
-
 #include <liblsp/Range.h>
 #include <liblsp/TextBuffer.h>
 
@@ -36,10 +34,10 @@ using TextLines = std::deque<std::string>;
 class File
 {
 public:
-	File(solidity::util::URI uri, std::string _languageId, int _version, std::string _text);
+	File(std::string path, std::string _languageId, int _version, std::string _text);
 
 	// readers
-	solidity::util::URI const& uri() const noexcept { return m_uri; }
+	std::string const& path() const noexcept { return m_path; }
 	std::string const& languageId() const noexcept { return m_languageId; }
 	constexpr int version() const noexcept { return m_version; }
 	std::string const& contentString() const { return m_buffer.data(); }
@@ -54,7 +52,7 @@ public:
 	static TextLines splitLines(std::string const& _text);
 
 private:
-	solidity::util::URI m_uri;
+	std::string m_path;
 	std::string m_languageId;
 	int m_version;
 	TextBuffer m_buffer;
@@ -66,17 +64,17 @@ public:
 	// accessors
 	//
 	size_t size() const noexcept { return m_files.size(); }
-	File const* find(solidity::util::URI const& _uri) const noexcept;
-	File* find(solidity::util::URI const& _uri) noexcept;
+	File const* find(std::string const& _path) const noexcept;
+	File* find(std::string const& _path) noexcept;
 
 	// modifiers
 	//
-	File& insert(solidity::util::URI _uri, std::string _languageId, int _version, TextLines _text);
-	File& insert(solidity::util::URI _uri, std::string _languageId, int _version, std::string _text);
-	void remove(solidity::util::URI const& _uri);
+	File& insert(std::string _path, std::string _languageId, int _version, TextLines _text);
+	File& insert(std::string _path, std::string _languageId, int _version, std::string _text);
+	void remove(std::string const& _path);
 
 	/// Modifies given VFS file by deleting the @p _range and replace it with the @p _replacementText.
-	void modify(solidity::util::URI const& _uri, Range const& _range, std::string const& _replacementText);
+	void modify(std::string const& _path, Range const& _range, std::string const& _replacementText);
 
 	/// Retrieves a read-only list of all files available in this VFS.
 	std::vector<std::reference_wrapper<File const>> files() const
@@ -89,7 +87,7 @@ public:
 	}
 
 private:
-	std::map<std::string /*URI*/, File> m_files = {};
+	std::map<std::string /*path*/, File> m_files = {};
 };
 
 } // end namespace

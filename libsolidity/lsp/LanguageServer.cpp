@@ -34,8 +34,6 @@
 #include <iostream>
 #include <string>
 
-using solidity::util::URI;
-
 using namespace std;
 using namespace std::placeholders;
 
@@ -80,15 +78,12 @@ LanguageServer::LanguageServer(::lsp::Transport& _client, Logger _logger):
 {
 }
 
-::lsp::ServerId LanguageServer::initialize(URI _rootUri, vector<::lsp::WorkspaceFolder> _workspaceFolders)
+::lsp::ServerId LanguageServer::initialize(string _rootPath, vector<::lsp::WorkspaceFolder> /*_workspaceFolders*/)
 {
-	(void) _workspaceFolders; // a list of root directories (usually one).
-	if (_rootUri.scheme == "file://"sv)
-	{
-		auto const fspath = boost::filesystem::path(_rootUri.path);
-		m_basePath = fspath;
-		m_allowedDirectories.push_back(fspath);
-	}
+	auto const fspath = boost::filesystem::path(_rootPath);
+
+	m_basePath = fspath;
+	m_allowedDirectories.push_back(fspath);
 
 	return {"solc", string(solidity::frontend::VersionNumber)};
 }
@@ -121,12 +116,12 @@ void LanguageServer::initialized()
 	log("LanguageServer: Client initialized");
 }
 
-void LanguageServer::documentOpened(URI const& _uri, string _languageId, int _documentVersion, std::string _contents)
+void LanguageServer::documentOpened(string const& _path, string _languageId, int _documentVersion, std::string _contents)
 {
-	log("LanguageServer: Opening document: " + to_string(_uri));
+	log("LanguageServer: Opening document: " + _path);
 
 	::lsp::vfs::File const& file = m_vfs.insert(
-		_uri,
+		_path,
 		_languageId,
 		_documentVersion,
 		_contents
@@ -135,14 +130,14 @@ void LanguageServer::documentOpened(URI const& _uri, string _languageId, int _do
 	validate(file);
 }
 
-void LanguageServer::documentContentUpdated(URI const& _uri, std::optional<int> _version, ::lsp::Range _range, std::string const& _text)
+void LanguageServer::documentContentUpdated(string const& _path, std::optional<int> _version, ::lsp::Range _range, std::string const& _text)
 {
 	// TODO: all this info is actually unrelated to solidity/lsp specifically except knowing that
 	// the file has updated, so we can  abstract that away and only do the re-validation here.
-	auto file = m_vfs.find(_uri);
+	auto file = m_vfs.find(_path);
 	if (!file)
 	{
-		log("LanguageServer: File to be modified not opened \"" + to_string(_uri) + "\"");
+		log("LanguageServer: File to be modified not opened \"" + _path + "\"");
 		return;
 	}
 
@@ -158,21 +153,21 @@ void LanguageServer::documentContentUpdated(URI const& _uri, std::optional<int> 
 
 }
 
-void LanguageServer::documentContentUpdated(URI const& _uri)
+void LanguageServer::documentContentUpdated(string const& _path)
 {
-	auto file = m_vfs.find(_uri);
+	auto file = m_vfs.find(_path);
 	if (!file)
-		log("LanguageServer: File to be modified not opened \"" + to_string(_uri) + "\"");
+		log("LanguageServer: File to be modified not opened \"" + _path + "\"");
 	else
 		validate(*file);
 }
 
-void LanguageServer::documentContentUpdated(URI const& _uri, optional<int> _version, string const& _fullContentChange)
+void LanguageServer::documentContentUpdated(string const& _path, optional<int> _version, string const& _fullContentChange)
 {
-	auto file = m_vfs.find(_uri);
+	auto file = m_vfs.find(_path);
 	if (!file)
 	{
-		log("LanguageServer: File to be modified not opened \"" + to_string(_uri) + "\"");
+		log("LanguageServer: File to be modified not opened \"" + _path + "\"");
 		return;
 	}
 
@@ -184,9 +179,9 @@ void LanguageServer::documentContentUpdated(URI const& _uri, optional<int> _vers
 	validate(*file);
 }
 
-void LanguageServer::documentClosed(URI const& _uri)
+void LanguageServer::documentClosed(string const& _path)
 {
-	log("LanguageServer: didClose: " + to_string(_uri));
+	log("LanguageServer: didClose: " + _path);
 }
 
 void LanguageServer::validateAll()
@@ -227,7 +222,7 @@ void LanguageServer::compile(::lsp::vfs::File const& _file)
 	// always start fresh when compiling
 	m_sourceCodes.clear();
 
-	m_sourceCodes[_file.uri().path] = _file.contentString();
+	m_sourceCodes[_file.path()] = _file.contentString();
 
 	m_fileReader = make_unique<FileReader>(m_basePath, m_allowedDirectories);
 
@@ -291,7 +286,7 @@ void LanguageServer::validate(::lsp::vfs::File const& _file)
 			auto related = ::lsp::DiagnosticRelatedInformation{};
 
 			related.message = secondary.message;
-			related.location.uri = URI::parse("file://" + secondary.sourceName).value(); // is the sourceName always a fully qualified path?
+			related.location.path = secondary.sourceName; // is the sourceName always a fully qualified path?
 			related.location.range.start.line = secondary.position.line;
 			related.location.range.start.column = secondary.startColumn;
 			related.location.range.end.line = secondary.position.line; // what about multiline?
@@ -306,7 +301,7 @@ void LanguageServer::validate(::lsp::vfs::File const& _file)
 		collectedDiagnostics.emplace_back(move(diag));
 	}
 	optional<int> version = nullopt; // TODO: do we need this? (AFAIK that's been the file version this diagnostics belongs to)
-	pushDiagnostics(_file.uri(), version, collectedDiagnostics);
+	pushDiagnostics(_file.path(), version, collectedDiagnostics);
 }
 
 frontend::ASTNode const* LanguageServer::findASTNode(::lsp::Position const& _position, std::string const& _fileName)
@@ -333,7 +328,7 @@ frontend::ASTNode const* LanguageServer::findASTNode(::lsp::Position const& _pos
 
 std::vector<::lsp::Location> LanguageServer::gotoDefinition(::lsp::DocumentPosition _location)
 {
-	auto const file = m_vfs.find(_location.uri);
+	auto const file = m_vfs.find(_location.path);
 	if (!file)
 	{
 		// error(_params.requestId, ErrorCode::InvalidRequest, "File not found in VFS.");
@@ -343,7 +338,7 @@ std::vector<::lsp::Location> LanguageServer::gotoDefinition(::lsp::DocumentPosit
 	// source should be compiled already
 	solAssert(m_compilerStack.get() != nullptr, "");
 
-	auto const sourceName = file->uri().path;
+	auto const sourceName = file->path();
 	auto const sourceNode = findASTNode(_location.position, sourceName);
 	if (!sourceNode)
 	{
@@ -363,7 +358,7 @@ std::vector<::lsp::Location> LanguageServer::gotoDefinition(::lsp::DocumentPosit
 		}
 
 		::lsp::Location output{};
-		output.uri = URI::parse("file://" + fpm->second).value();
+		output.path = fpm->second;
 		return {output};
 	}
 	else if (auto const n = dynamic_cast<frontend::MemberAccess const*>(sourceNode))
@@ -414,9 +409,9 @@ optional<::lsp::Location> LanguageServer::declarationPosition(frontend::Declarat
 
 	auto output = ::lsp::Location{};
 	if (auto fullPath = m_fileReader->fullPathMapping().find(sourceName); fullPath != m_fileReader->fullPathMapping().end())
-		output.uri = URI::parse("file://" + fullPath->second).value();
+		output.path = fullPath->second;
 	else
-		output.uri = URI::parse("file://" + sourceName).value();
+		output.path = sourceName;
 
 	output.range = {
 		{startLine, startColumn},
@@ -445,7 +440,7 @@ void LanguageServer::findAllReferences(
 	frontend::Declaration const* _declaration,
 	string const& _sourceIdentifierName,
 	frontend::SourceUnit const& _sourceUnit,
-	URI const& _sourceUnitUri,
+	string const& _sourceUnitPath,
 	std::vector<::lsp::Location>& _output
 )
 {
@@ -453,25 +448,24 @@ void LanguageServer::findAllReferences(
 	{
 		auto location = ::lsp::Location{};
 		location.range = highlight.range;
-		location.uri = _sourceUnitUri;
+		location.path = _sourceUnitPath;
 		_output.emplace_back(location);
 	}
 }
 
-
 vector<::lsp::Location> LanguageServer::references(::lsp::DocumentPosition _documentPosition)
 {
 	trace(
-		"find all references: "s +
-		to_string(_documentPosition.uri) + ":" +
+		"find all references: " +
+		_documentPosition.path + ":" +
 		to_string(_documentPosition.position.line) + ":" +
 		to_string(_documentPosition.position.column)
 	);
 
-	auto const file = m_vfs.find(_documentPosition.uri);
+	auto const file = m_vfs.find(_documentPosition.path);
 	if (!file)
 	{
-		trace("File does not exist. "s + to_string(_documentPosition.uri));
+		trace("File does not exist. " + _documentPosition.path);
 		return {};
 	}
 
@@ -480,7 +474,7 @@ vector<::lsp::Location> LanguageServer::references(::lsp::DocumentPosition _docu
 
 	solAssert(m_compilerStack.get() != nullptr, "");
 
-	auto const sourceName = file->uri().path;
+	auto const sourceName = file->path();
 
 	auto const sourceNode = findASTNode(_documentPosition.position, sourceName);
 	if (!sourceNode)
@@ -492,28 +486,28 @@ vector<::lsp::Location> LanguageServer::references(::lsp::DocumentPosition _docu
 	auto output = vector<::lsp::Location>{};
 	if (auto const sourceIdentifier = dynamic_cast<Identifier const*>(sourceNode))
 	{
-		auto const sourceName = _documentPosition.uri.path;
+		auto const sourceName = _documentPosition.path;
 		frontend::SourceUnit const& sourceUnit = m_compilerStack->ast(sourceName);
 
 		if (auto decl = sourceIdentifier->annotation().referencedDeclaration)
-			findAllReferences(decl, sourceUnit, _documentPosition.uri, output);
+			findAllReferences(decl, sourceUnit, _documentPosition.path, output);
 		else
 			trace("references: referencedDeclaration == NULL");
 
 		for (auto const decl: sourceIdentifier->annotation().candidateDeclarations)
-			findAllReferences(decl, sourceUnit, _documentPosition.uri, output);
+			findAllReferences(decl, sourceUnit, _documentPosition.path, output);
 	}
 	else if (auto const varDecl = dynamic_cast<VariableDeclaration const*>(sourceNode))
 	{
-		auto const sourceName = _documentPosition.uri.path;
+		auto const sourceName = _documentPosition.path;
 		frontend::SourceUnit const& sourceUnit = m_compilerStack->ast(sourceName);
-		findAllReferences(varDecl, sourceUnit, _documentPosition.uri, output);
+		findAllReferences(varDecl, sourceUnit, _documentPosition.path, output);
 	}
 	else if (auto const memberAccess = dynamic_cast<MemberAccess const*>(sourceNode))
 	{
-		auto const sourceName = _documentPosition.uri.path;
+		auto const sourceName = _documentPosition.path;
 		frontend::SourceUnit const& sourceUnit = m_compilerStack->ast(sourceName);
-		findAllReferences(varDecl, sourceUnit, _documentPosition.uri, output);
+		findAllReferences(varDecl, sourceUnit, _documentPosition.path, output);
 	}
 	else
 		trace("references: not an identifier");
@@ -523,7 +517,7 @@ vector<::lsp::Location> LanguageServer::references(::lsp::DocumentPosition _docu
 
 vector<::lsp::DocumentHighlight> LanguageServer::semanticHighlight(::lsp::DocumentPosition _documentPosition)
 {
-	auto const file = m_vfs.find(_documentPosition.uri);
+	auto const file = m_vfs.find(_documentPosition.path);
 	if (!file)
 	{
 		// reply(_params.requestId, output);
@@ -534,7 +528,7 @@ vector<::lsp::DocumentHighlight> LanguageServer::semanticHighlight(::lsp::Docume
 	compile(*file);
 	solAssert(m_compilerStack.get() != nullptr, "");
 
-	auto const sourceName = file->uri().path;
+	auto const sourceName = file->path();
 
 	auto const sourceNode = findASTNode(_documentPosition.position, sourceName);
 	if (!sourceNode)
@@ -554,7 +548,7 @@ vector<::lsp::DocumentHighlight> LanguageServer::semanticHighlight(::lsp::Docume
 	// TODO: ImportDirective: hovering a symbol of an import directive should highlight all uses of that symbol.
 	if (auto const* sourceIdentifier = dynamic_cast<Identifier const*>(sourceNode))
 	{
-		auto const sourceName = _documentPosition.uri.path;
+		auto const sourceName = _documentPosition.path;
 		frontend::SourceUnit const& sourceUnit = m_compilerStack->ast(sourceName);
 
 		vector<::lsp::DocumentHighlight> output;
@@ -572,7 +566,7 @@ vector<::lsp::DocumentHighlight> LanguageServer::semanticHighlight(::lsp::Docume
 	}
 	else if (auto const* varDecl = dynamic_cast<VariableDeclaration const*>(sourceNode))
 	{
-		auto const sourceName = _documentPosition.uri.path;
+		auto const sourceName = _documentPosition.path;
 		frontend::SourceUnit const& sourceUnit = m_compilerStack->ast(sourceName);
 		output = findAllReferences(varDecl, sourceUnit);
 	}
@@ -583,7 +577,7 @@ vector<::lsp::DocumentHighlight> LanguageServer::semanticHighlight(::lsp::Docume
 		{
 			auto const memberName = memberAccess->memberName();
 
-			auto const sourceName = _documentPosition.uri.path;
+			auto const sourceName = _documentPosition.path;
 			frontend::SourceUnit const& sourceUnit = m_compilerStack->ast(sourceName);
 
 			if (auto const* enumType = dynamic_cast<EnumType const*>(ttype->actualType()))
@@ -610,7 +604,7 @@ vector<::lsp::DocumentHighlight> LanguageServer::semanticHighlight(::lsp::Docume
 		//
 		// if (auto const tt = dynamic_cast<TypeType const*>(type))
 		// {
-		// 	auto const sourceName = _documentPosition.uri.substr(7); // strip "file://"
+		// 	auto const sourceName = _documentPosition.path;
 		// 	frontend::SourceUnit const& sourceUnit = m_compilerStack->ast(sourceName);
 		// 	output = findAllReferences(declaration, sourceUnit);
 		// }

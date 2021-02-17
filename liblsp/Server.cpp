@@ -25,7 +25,7 @@
 #include <ostream>
 #include <string>
 
-using solidity::util::URI;
+#include <boost/algorithm/string/predicate.hpp>
 
 using namespace std;
 using namespace std::placeholders;
@@ -35,9 +35,22 @@ namespace lsp {
 
 namespace
 {
+	optional<string> extractPathFromFileURI(std::string const& _uri)
+	{
+		if (!boost::starts_with(_uri, "file://"))
+			return nullopt;
+
+		return _uri.substr(7);
+	}
+
+	string toFileURI(std::string const& _path)
+	{
+		return "file://" + _path;
+	}
+
 	void loadTextDocumentPosition(DocumentPosition& _params, Json::Value const& _json)
 	{
-		_params.uri = URI::parse(_json["textDocument"]["uri"].asString()).value();
+		_params.path = extractPathFromFileURI(_json["textDocument"]["uri"].asString()).value();
 		_params.position.line = _json["position"]["line"].asInt();
 		_params.position.column = _json["position"]["character"].asInt();
 	}
@@ -64,13 +77,13 @@ Server::Server(Transport& _client, std::function<void(std::string_view)> _logger
 		{"initialize", bind(&Server::handle_initializeRequest, this, _1, _2)},
 		{"initialized", [this](auto, auto) { initialized(); }},
 		{"shutdown", [this](auto, auto) { m_shutdownRequested = true; }},
+		{"workspace/didChangeConfiguration", bind(&Server::handle_workspace_didChangeConfiguration, this, _1, _2)},
 		{"textDocument/didOpen", bind(&Server::handle_textDocument_didOpen, this, _1, _2)},
 		{"textDocument/didChange", bind(&Server::handle_textDocument_didChange, this, _1, _2)},
 		{"textDocument/didClose", bind(&Server::handle_textDocument_didClose, this, _1, _2)},
 		{"textDocument/definition", bind(&Server::handle_textDocument_definition, this, _1, _2)},
 		{"textDocument/documentHighlight", bind(&Server::handle_textDocument_highlight, this, _1, _2)},
 		{"textDocument/references", bind(&Server::handle_textDocument_references, this, _1, _2)},
-		{"workspace/didChangeConfiguration", bind(&Server::handle_workspace_didChangeConfiguration, this, _1, _2)},
 	},
 	m_logger{std::move(_logger)}
 {
@@ -128,11 +141,11 @@ void Server::handleMessage(Json::Value const& _jsonMessage)
 
 void Server::handle_initializeRequest(MessageId _id, Json::Value const& _args)
 {
-	URI rootUri;
-	if (Json::Value uri = _args["rootUri"]; uri)
-		rootUri = URI::parse(uri.asString()).value();
+	string rootPath;
+	if (Json::Value uri = _args["rootUri"])
+		rootPath = extractPathFromFileURI(uri.asString()).value();
 	else if (Json::Value rootPath = _args["rootPath"]; rootPath)
-		rootUri = URI::parse("file://" + rootPath.asString()).value();
+		rootPath = rootPath.asString();
 
 	if (Json::Value value = _args["trace"]; value)
 	{
@@ -152,7 +165,7 @@ void Server::handle_initializeRequest(MessageId _id, Json::Value const& _args)
 		{
 			WorkspaceFolder wsFolder{};
 			wsFolder.name = folder["name"].asString();
-			wsFolder.uri = URI::parse(folder["uri"].asString()).value();
+			wsFolder.path = extractPathFromFileURI(folder["uri"].asString()).value();
 			workspaceFolders.emplace_back(move(wsFolder));
 		}
 	}
@@ -160,7 +173,7 @@ void Server::handle_initializeRequest(MessageId _id, Json::Value const& _args)
 	// TODO: ClientCapabilities
 	// ... Do we actually care? Not in the initial PR.
 
-	auto const info = initialize(move(rootUri), move(workspaceFolders));
+	auto const info = initialize(move(rootPath), move(workspaceFolders));
 
 	if (_args["initializationOptions"].isObject())
 		changeConfiguration(_args["initializationOptions"]);
@@ -209,12 +222,12 @@ void Server::handle_textDocument_didOpen(MessageId /*_id*/, Json::Value const& _
 	if (!_args["textDocument"])
 		return;
 
-	auto const uri = URI::parse(_args["textDocument"]["uri"].asString()).value();
+	auto const path = extractPathFromFileURI(_args["textDocument"]["uri"].asString()).value();
 	auto const languageId = _args["textDocument"]["languageId"].asString();
 	auto const version = _args["textDocument"]["version"].asInt();
 	auto const text = _args["textDocument"]["text"].asString();
 
-	documentOpened(uri, languageId, version, text);
+	documentOpened(path, languageId, version, text);
 
 	// no encoding
 }
@@ -222,7 +235,7 @@ void Server::handle_textDocument_didOpen(MessageId /*_id*/, Json::Value const& _
 void Server::handle_textDocument_didChange(MessageId /*_id*/, Json::Value const& _args)
 {
 	auto const version = _args["textDocument"]["version"].asInt();
-	auto const uri = URI::parse(_args["textDocument"]["uri"].asString()).value();
+	auto const path = extractPathFromFileURI(_args["textDocument"]["uri"].asString()).value();
 
 	// TODO: in the longer run, I'd like to try moving the VFS handling into Server class, so
 	// the specific Solidity LSP implementation doesn't need to care about that.
@@ -245,22 +258,22 @@ void Server::handle_textDocument_didChange(MessageId /*_id*/, Json::Value const&
 			range.end.line = jsonRange["end"]["line"].asInt();
 			range.end.column = jsonRange["end"]["character"].asInt();
 
-			documentContentUpdated(uri, version, range, text);
+			documentContentUpdated(path, version, range, text);
 		}
 		else
 		{
 			// full content update
-			documentContentUpdated(uri, version, text);
+			documentContentUpdated(path, version, text);
 		}
 	}
 
 	if (!contentChanges.empty())
-		documentContentUpdated(uri); // tell LSP impl we're done with content updates.
+		documentContentUpdated(path); // tell LSP impl we're done with content updates.
 }
 
 void Server::handle_textDocument_didClose(MessageId /*_id*/, Json::Value const& _args)
 {
-	documentClosed(URI::parse(_args["textDocument"]["uri"].asString()).value());
+	documentClosed(extractPathFromFileURI(_args["textDocument"]["uri"].asString()).value());
 }
 
 void Server::handle_textDocument_definition(MessageId _id, Json::Value const& _args)
@@ -272,7 +285,7 @@ void Server::handle_textDocument_definition(MessageId _id, Json::Value const& _a
 	for (::lsp::Location const& target: gotoDefinition(dpos))
 	{
 		Json::Value json = Json::objectValue;
-		json["uri"] = to_string(target.uri);
+		json["uri"] = toFileURI(target.path);
 		json["range"]["start"]["line"] = target.range.start.line;
 		json["range"]["start"]["character"] = target.range.start.column;
 		json["range"]["end"]["line"] = target.range.end.line;
@@ -319,7 +332,7 @@ void Server::handle_textDocument_references(MessageId _id, Json::Value const& _a
 		item["range"]["start"]["character"] = location.range.start.column;
 		item["range"]["end"]["line"] = location.range.end.line;
 		item["range"]["end"]["character"] = location.range.end.column;
-		item["uri"] = to_string(location.uri);
+		item["uri"] = toFileURI(location.path);
 
 		replyArgs.append(item);
 	}
@@ -361,11 +374,11 @@ void Server::trace(string const& _message)
 		m_logger(_message);
 }
 
-void Server::pushDiagnostics(URI const& _uri, optional<int> _version, vector<Diagnostic> const& _diagnostics)
+void Server::pushDiagnostics(string const& _path, optional<int> _version, vector<Diagnostic> const& _diagnostics)
 {
 	Json::Value params;
 
-	params["uri"] = to_string(_uri);
+	params["uri"] = toFileURI(_path);
 
 	if (_version)
 		params["version"] = _version.value();
@@ -398,7 +411,7 @@ void Server::pushDiagnostics(URI const& _uri, optional<int> _version, vector<Dia
 			{
 				Json::Value json;
 				json["message"] = related.message;
-				json["location"]["uri"] = to_string(related.location.uri);
+				json["location"]["uri"] = toFileURI(related.location.path);
 				json["location"]["range"] = toJson(related.location.range);
 				jsonDiag["relatedInformation"].append(json);
 			}
