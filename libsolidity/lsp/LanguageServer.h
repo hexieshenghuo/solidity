@@ -56,15 +56,14 @@ public:
 	//std::vector<boost::filesystem::path>& allowedDirectories() noexcept { return m_allowedDirectories; }
 
 	// Client-to-Server messages
-	::lsp::ServerId initialize(std::string _rootUri, std::vector<::lsp::WorkspaceFolder> _workspaceFolders) override;
+	::lsp::ServerId initialize(solidity::util::URI _rootUri, std::vector<::lsp::WorkspaceFolder> _workspaceFolders) override;
 	void initialized() override;
-	void shutdown() override;
 	void changeConfiguration(Json::Value const&) override;
-	void documentOpened(std::string const& _uri, std::string _languageId, int _documentVersion, std::string _contents) override;
-	void documentContentUpdated(std::string const& _uri, std::optional<int> _documentVersion, std::string const& _fullContentChange) override;
-	void documentContentUpdated(std::string const& _uri, std::optional<int> _version, ::lsp::Range _range, std::string const& _text) override;
-	void documentContentUpdated(std::string const& _uri) override;
-	void documentClosed(std::string const& _uri) override;
+	void documentOpened(solidity::util::URI const& _uri, std::string _languageId, int _documentVersion, std::string _contents) override;
+	void documentContentUpdated(solidity::util::URI const& _uri, std::optional<int> _documentVersion, std::string const& _fullContentChange) override;
+	void documentContentUpdated(solidity::util::URI const& _uri, std::optional<int> _version, ::lsp::Range _range, std::string const& _text) override;
+	void documentContentUpdated(solidity::util::URI const& _uri) override;
+	void documentClosed(solidity::util::URI const& _uri) override;
 	std::vector<::lsp::Location> gotoDefinition(::lsp::DocumentPosition _position) override;
 	std::vector<::lsp::DocumentHighlight> semanticHighlight(::lsp::DocumentPosition _documentPosition) override;
 	std::vector<::lsp::Location> references(::lsp::DocumentPosition _documentPosition) override;
@@ -105,14 +104,14 @@ private:
 		frontend::Declaration const* _declaration,
 		std::string const& _sourceIdentifierName,
 		frontend::SourceUnit const& _sourceUnit,
-		std::string const& _sourceUnitUri,
+		solidity::util::URI const& _sourceUnitUri,
 		std::vector<::lsp::Location>& _output
 	);
 
 	void findAllReferences(
 		frontend::Declaration const* _declaration,
 		frontend::SourceUnit const& _sourceUnit,
-		std::string const& _sourceUnitUri,
+		solidity::util::URI const& _sourceUnitUri,
 		std::vector<::lsp::Location>& _output
 	)
 	{

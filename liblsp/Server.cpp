@@ -25,6 +25,8 @@
 #include <ostream>
 #include <string>
 
+using solidity::util::URI;
+
 using namespace std;
 using namespace std::placeholders;
 using namespace std::string_literals;
@@ -35,7 +37,7 @@ namespace
 {
 	void loadTextDocumentPosition(DocumentPosition& _params, Json::Value const& _json)
 	{
-		_params.uri = _json["textDocument"]["uri"].asString();
+		_params.uri = URI::parse(_json["textDocument"]["uri"].asString()).value();
 		_params.position.line = _json["position"]["line"].asInt();
 		_params.position.column = _json["position"]["character"].asInt();
 	}
@@ -126,11 +128,11 @@ void Server::handleMessage(Json::Value const& _jsonMessage)
 
 void Server::handle_initializeRequest(MessageId _id, Json::Value const& _args)
 {
-	std::string rootUri;
+	URI rootUri;
 	if (Json::Value uri = _args["rootUri"]; uri)
-		rootUri = uri.asString();
+		rootUri = URI::parse(uri.asString()).value();
 	else if (Json::Value rootPath = _args["rootPath"]; rootPath)
-		rootUri = "file://" + rootPath.asString();
+		rootUri = URI::parse("file://" + rootPath.asString()).value();
 
 	if (Json::Value value = _args["trace"]; value)
 	{
@@ -150,7 +152,7 @@ void Server::handle_initializeRequest(MessageId _id, Json::Value const& _args)
 		{
 			WorkspaceFolder wsFolder{};
 			wsFolder.name = folder["name"].asString();
-			wsFolder.uri = folder["uri"].asString();
+			wsFolder.uri = URI::parse(folder["uri"].asString()).value();
 			workspaceFolders.emplace_back(move(wsFolder));
 		}
 	}
@@ -207,7 +209,7 @@ void Server::handle_textDocument_didOpen(MessageId /*_id*/, Json::Value const& _
 	if (!_args["textDocument"])
 		return;
 
-	auto const uri = _args["textDocument"]["uri"].asString();
+	auto const uri = URI::parse(_args["textDocument"]["uri"].asString()).value();
 	auto const languageId = _args["textDocument"]["languageId"].asString();
 	auto const version = _args["textDocument"]["version"].asInt();
 	auto const text = _args["textDocument"]["text"].asString();
@@ -220,7 +222,7 @@ void Server::handle_textDocument_didOpen(MessageId /*_id*/, Json::Value const& _
 void Server::handle_textDocument_didChange(MessageId /*_id*/, Json::Value const& _args)
 {
 	auto const version = _args["textDocument"]["version"].asInt();
-	auto const uri = _args["textDocument"]["uri"].asString();
+	auto const uri = URI::parse(_args["textDocument"]["uri"].asString()).value();
 
 	// TODO: in the longer run, I'd like to try moving the VFS handling into Server class, so
 	// the specific Solidity LSP implementation doesn't need to care about that.
@@ -258,8 +260,7 @@ void Server::handle_textDocument_didChange(MessageId /*_id*/, Json::Value const&
 
 void Server::handle_textDocument_didClose(MessageId /*_id*/, Json::Value const& _args)
 {
-	auto const uri = _args["textDocument"]["uri"].asString();
-	documentClosed(uri);
+	documentClosed(URI::parse(_args["textDocument"]["uri"].asString()).value());
 }
 
 void Server::handle_textDocument_definition(MessageId _id, Json::Value const& _args)
@@ -271,7 +272,7 @@ void Server::handle_textDocument_definition(MessageId _id, Json::Value const& _a
 	for (::lsp::Location const& target: gotoDefinition(dpos))
 	{
 		Json::Value json = Json::objectValue;
-		json["uri"] = target.uri;
+		json["uri"] = to_string(target.uri);
 		json["range"]["start"]["line"] = target.range.start.line;
 		json["range"]["start"]["character"] = target.range.start.column;
 		json["range"]["end"]["line"] = target.range.end.line;
@@ -318,7 +319,7 @@ void Server::handle_textDocument_references(MessageId _id, Json::Value const& _a
 		item["range"]["start"]["character"] = location.range.start.column;
 		item["range"]["end"]["line"] = location.range.end.line;
 		item["range"]["end"]["character"] = location.range.end.column;
-		item["uri"] = location.uri;
+		item["uri"] = to_string(location.uri);
 
 		replyArgs.append(item);
 	}
@@ -360,11 +361,11 @@ void Server::trace(string const& _message)
 		m_logger(_message);
 }
 
-void Server::pushDiagnostics(string const& _uri, optional<int> _version, vector<Diagnostic> const& _diagnostics)
+void Server::pushDiagnostics(URI const& _uri, optional<int> _version, vector<Diagnostic> const& _diagnostics)
 {
 	Json::Value params;
 
-	params["uri"] = _uri;
+	params["uri"] = to_string(_uri);
 
 	if (_version)
 		params["version"] = _version.value();
@@ -397,7 +398,7 @@ void Server::pushDiagnostics(string const& _uri, optional<int> _version, vector<
 			{
 				Json::Value json;
 				json["message"] = related.message;
-				json["location"]["uri"] = related.location.uri;
+				json["location"]["uri"] = to_string(related.location.uri);
 				json["location"]["range"] = toJson(related.location.range);
 				jsonDiag["relatedInformation"].append(json);
 			}

@@ -26,17 +26,7 @@
 
 #include <boost/test/unit_test.hpp>
 
-// namespace std {
-// 	ostream& operator<<(ostream& _os, lsp::vfs::TextLines const& _lines)
-// 	{
-// 		_os << '{';
-// 		for (size_t i = 0; i < _lines.size(); ++i)
-// 			_os << (i ? ", " : "") << '"' << _lines[i] << '"';
-// 		_os << '}';
-// 		return _os;
-// 	}
-// }
-
+using solidity::util::URI;
 using namespace std;
 
 namespace lsp::test
@@ -74,9 +64,10 @@ BOOST_AUTO_TEST_CASE(vfs_File_splitLines)
 BOOST_AUTO_TEST_CASE(VFS_create)
 {
 	vfs::VFS vfs;
-	vfs.insert("file:///project/test.txt", "text", 1, "Hello, World\n");
+	auto const path = URI::parse("file:///project/test.txt").value();
+	vfs.insert(path, "text", 1, "Hello, World\n");
 
-	auto const file = vfs.find("file:///project/test.txt");
+	auto const file = vfs.find(path);
 	BOOST_CHECK_NE(file, nullptr);
 
 	BOOST_CHECK_EQUAL(file->uri(), "file:///project/test.txt");
@@ -89,7 +80,8 @@ BOOST_AUTO_TEST_CASE(VFS_create)
 BOOST_AUTO_TEST_CASE(VFS_modify_erase)
 {
 	vfs::VFS vfs;
-	vfs::File& file = vfs.insert("file:///project/test.txt", "text", 1, "Hello, World\n");
+	auto const path = URI::parse("file:///project/test.txt").value();
+	vfs::File& file = vfs.insert(path, "text", 1, "Hello, World\n");
 	file.modify(Range{{0, 0}, {0, 1}}, "");
 
 	BOOST_CHECK_EQUAL(file.contentString(), "ello, World\n");
@@ -104,7 +96,8 @@ BOOST_AUTO_TEST_CASE(VFS_modify_erase)
 BOOST_AUTO_TEST_CASE(VFS_modify_erase_multiline)
 {
 	vfs::VFS vfs;
-	vfs::File& file = vfs.insert("file:///project/test.txt", "text", 1, "Hello,\nWorld\nCrew\n");
+	auto const path = URI::parse("file:///project/test.txt").value();
+	vfs::File& file = vfs.insert(path, "text", 1, "Hello,\nWorld\nCrew\n");
 	file.modify(Range{{0, 1}, {2, 2}}, "");
 
 	BOOST_CHECK_EQUAL(file.contentString(), "Hew\n");
@@ -113,7 +106,8 @@ BOOST_AUTO_TEST_CASE(VFS_modify_erase_multiline)
 BOOST_AUTO_TEST_CASE(VFS_modify_change)
 {
 	vfs::VFS vfs;
-	vfs::File& file = vfs.insert("file:///project/test.txt", "text", 1, "Hello, World\n");
+	auto const path = URI::parse("file:///project/test.txt").value();
+	vfs::File& file = vfs.insert(path, "text", 1, "Hello, World\n");
 	file.modify(Range{{0, 5}, {0, 6}}, ";");
 
 	BOOST_CHECK_EQUAL(file.contentString(), "Hello; World\n");
@@ -123,7 +117,8 @@ BOOST_AUTO_TEST_CASE(VFS_modify_change_single_to_multi_line2)
 {
 	// replace fragment of a single line with 2 lines
 	vfs::VFS vfs;
-	vfs::File& file = vfs.insert("file:///project/test.txt", "text", 1, "Hello\nWorld\n");
+	auto const path = URI::parse("file:///project/test.txt").value();
+	vfs::File& file = vfs.insert(path, "text", 1, "Hello\nWorld\n");
 	file.modify(Range{{0, 1}, {0, 2}}, "{foo\nbar}");
 
 	BOOST_CHECK_EQUAL(file.contentString(), "H{foo\nbar}llo\nWorld\n");
@@ -133,7 +128,8 @@ BOOST_AUTO_TEST_CASE(VFS_modify_change_single_to_multi_line3)
 {
 	// replace fragment of a single line with 3 lines
 	vfs::VFS vfs;
-	vfs::File& file = vfs.insert("file:///project/test.txt", "text", 1, "Hello\nWorld\n");
+	auto const path = URI::parse("file:///project/test.txt").value();
+	vfs::File& file = vfs.insert(path, "text", 1, "Hello\nWorld\n");
 	file.modify(Range{{0, 1}, {0, 2}}, "{foo\nbar\ncom}");
 
 	BOOST_CHECK_EQUAL(file.contentString(), "H{foo\nbar\ncom}llo\nWorld\n");
@@ -143,7 +139,8 @@ BOOST_AUTO_TEST_CASE(VFS_modify_change_single_to_multi_line3_last_empty)
 {
 	// replace fragment of a single line with 3 lines
 	vfs::VFS vfs;
-	vfs::File& file = vfs.insert("file:///project/test.txt", "text", 1, "Hello\nWorld\n");
+	auto const path = URI::parse("file:///project/test.txt").value();
+	vfs::File& file = vfs.insert(path, "text", 1, "Hello\nWorld\n");
 	file.modify(Range{{0, 1}, {0, 2}}, "{foo\nbar}\n");
 
 	BOOST_CHECK_EQUAL(file.contentString(), "H{foo\nbar}\nllo\nWorld\n");
@@ -167,7 +164,8 @@ BOOST_AUTO_TEST_CASE(VFS_modify_insert_at_the_beginning)
 BOOST_AUTO_TEST_CASE(VFS_modify_insert)
 {
 	vfs::VFS vfs;
-	vfs::File& file = vfs.insert("file:///project/test.txt", "text", 1, "Hello, World\n");
+	auto const path = URI::parse("file:///project/test.txt").value();
+	vfs::File& file = vfs.insert(path, "text", 1, "Hello, World\n");
 	file.modify(Range{{0, 5}, {0, 5}}, ";");
 
 	BOOST_CHECK_EQUAL(file.contentString(), "Hello;, World\n");

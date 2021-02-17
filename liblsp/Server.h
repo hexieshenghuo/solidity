@@ -20,6 +20,8 @@
 #include <liblsp/Transport.h>
 #include <liblsp/Range.h>
 
+#include <libsolutil/URI.h>
+
 #include <json/value.h>
 
 #include <functional>
@@ -39,11 +41,11 @@ enum class Trace { Off, Messages, Verbose };
 
 struct WorkspaceFolder {
 	std::string name; // The name of the workspace folder. Used to refer to this workspace folder in the user interface.
-	std::string uri;  // The associated URI for this workspace folder.
+	solidity::util::URI uri;  // The associated URI for this workspace folder.
 };
 
 struct DocumentPosition {
-	std::string uri;
+	solidity::util::URI uri;
 	Position position;
 };
 
@@ -60,7 +62,7 @@ enum class DocumentHighlightKind {
 };
 
 struct Location {
-	std::string uri;
+	solidity::util::URI uri;
 	Range range;
 };
 
@@ -136,13 +138,10 @@ public:
 
 	// {{{ Client-to-Server API
 	/// Invoked by the client to trigger server initialization.
-	virtual ServerId initialize(std::string _rootUri, std::vector<WorkspaceFolder> _workspaceFolders) = 0;
+	virtual ServerId initialize(solidity::util::URI _rootUri, std::vector<WorkspaceFolder> _workspaceFolders) = 0;
 
 	/// Notification being sent when the client has finished initialization.
 	virtual void initialized() {}
-
-	/// The client requested a shutdown (without terminating). Only `Exit` event is valid after this.
-	virtual void shutdown() = 0;
 
 	/// Invoked when the server user-supplied configuration changes (initiated by the client).
 	virtual void changeConfiguration(Json::Value const&) {}
@@ -153,17 +152,17 @@ public:
 	/// @param _languageId
 	/// @param _version
 	/// @param _contents
-	virtual void documentOpened(std::string const& /*_uri*/, std::string /*_languageId*/, int /*_version*/, std::string /*_contents*/) {}
+	virtual void documentOpened(solidity::util::URI const& /*_uri*/, std::string /*_languageId*/, int /*_version*/, std::string /*_contents*/) {}
 
 	/// The given document was fully replaced with @p _contents.
 	///
 	/// @param _uri
 	/// @param _documentVersion
 	/// @param _contents
-	virtual void documentContentUpdated(std::string const& /*_uri*/, std::optional<int> /*_version*/, std::string const& /*_fullContentChange*/) {}
+	virtual void documentContentUpdated(solidity::util::URI const& /*_uri*/, std::optional<int> /*_version*/, std::string const& /*_fullContentChange*/) {}
 
 	/// Invoked to notify LSP implementation that updates have happened to the given document.
-	virtual void documentContentUpdated(std::string const& /*_uri*/) {}
+	virtual void documentContentUpdated(solidity::util::URI const& /*_uri*/) {}
 
 	/// The given document was partially updated at @p _range with @p _contents.
 	///
@@ -173,14 +172,14 @@ public:
 	/// @param _range The range that is going to be replaced
 	/// @param _text the replacement text
 	virtual void documentContentUpdated(
-		std::string const& /*_uri*/,
+		solidity::util::URI const& /*_uri*/,
 		std::optional<int> /*_version*/,
 		Range /*_range*/,
 		std::string const& /*_text*/
 	) {}
 
 	/// The given document was closed.
-	virtual void documentClosed(std::string const& /*_uri*/) {}
+	virtual void documentClosed(solidity::util::URI const& /*_uri*/) {}
 
 	/// IDE action: "Go to definition"
 	///
@@ -207,7 +206,7 @@ public:
 	/// @param _version     Optional the version number of the document the diagnostics are published for.
 	/// @param _diagnostics An array of diagnostic information items.
 	void pushDiagnostics(
-		std::string const& _uri,
+		solidity::util::URI const& _uri,
 		std::optional<int> _version,
 		std::vector<Diagnostic> const& _diagnostics
 	);

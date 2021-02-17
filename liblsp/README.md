@@ -3,7 +3,7 @@
 This small library is meant to be a somewhat general purpose, i.e. not specifically bound to be exclusively
 used by Solidity, but certainly created to provide a language server for Solidity & Yul.
 
-This library is based on the LSP proposal version 3.16, that can be found at:
+This library implements a subset LSP proposal version 3.16, that can be found at:
 
 https://microsoft.github.io/language-server-protocol/specifications/specification-3-16/
 

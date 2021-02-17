@@ -34,6 +34,8 @@
 #include <iostream>
 #include <string>
 
+using solidity::util::URI;
+
 using namespace std;
 using namespace std::placeholders;
 
@@ -78,17 +80,12 @@ LanguageServer::LanguageServer(::lsp::Transport& _client, Logger _logger):
 {
 }
 
-void LanguageServer::shutdown()
-{
-	log("LanguageServer: shutdown requested");
-}
-
-::lsp::ServerId LanguageServer::initialize(string _rootUri, vector<::lsp::WorkspaceFolder> _workspaceFolders)
+::lsp::ServerId LanguageServer::initialize(URI _rootUri, vector<::lsp::WorkspaceFolder> _workspaceFolders)
 {
 	(void) _workspaceFolders; // a list of root directories (usually one).
-	if (boost::starts_with(_rootUri, "file:///"))
+	if (_rootUri.scheme == "file://"sv)
 	{
-		auto const fspath = boost::filesystem::path(_rootUri.substr(7));
+		auto const fspath = boost::filesystem::path(_rootUri.path);
 		m_basePath = fspath;
 		m_allowedDirectories.push_back(fspath);
 	}
@@ -124,9 +121,9 @@ void LanguageServer::initialized()
 	log("LanguageServer: Client initialized");
 }
 
-void LanguageServer::documentOpened(string const& _uri, string _languageId, int _documentVersion, std::string _contents)
+void LanguageServer::documentOpened(URI const& _uri, string _languageId, int _documentVersion, std::string _contents)
 {
-	log("LanguageServer: Opening document: " + _uri);
+	log("LanguageServer: Opening document: " + to_string(_uri));
 
 	::lsp::vfs::File const& file = m_vfs.insert(
 		_uri,
@@ -138,14 +135,14 @@ void LanguageServer::documentOpened(string const& _uri, string _languageId, int 
 	validate(file);
 }
 
-void LanguageServer::documentContentUpdated(std::string const& _uri, std::optional<int> _version, ::lsp::Range _range, std::string const& _text)
+void LanguageServer::documentContentUpdated(URI const& _uri, std::optional<int> _version, ::lsp::Range _range, std::string const& _text)
 {
 	// TODO: all this info is actually unrelated to solidity/lsp specifically except knowing that
 	// the file has updated, so we can  abstract that away and only do the re-validation here.
 	auto file = m_vfs.find(_uri);
 	if (!file)
 	{
-		log("LanguageServer: File to be modified not opened \"" + _uri + "\"");
+		log("LanguageServer: File to be modified not opened \"" + to_string(_uri) + "\"");
 		return;
 	}
 
@@ -161,21 +158,21 @@ void LanguageServer::documentContentUpdated(std::string const& _uri, std::option
 
 }
 
-void LanguageServer::documentContentUpdated(string const& _uri)
+void LanguageServer::documentContentUpdated(URI const& _uri)
 {
 	auto file = m_vfs.find(_uri);
 	if (!file)
-		log("LanguageServer: File to be modified not opened \"" + _uri + "\"");
+		log("LanguageServer: File to be modified not opened \"" + to_string(_uri) + "\"");
 	else
 		validate(*file);
 }
 
-void LanguageServer::documentContentUpdated(string const& _uri, optional<int> _version, string const& _fullContentChange)
+void LanguageServer::documentContentUpdated(URI const& _uri, optional<int> _version, string const& _fullContentChange)
 {
 	auto file = m_vfs.find(_uri);
 	if (!file)
 	{
-		log("LanguageServer: File to be modified not opened \"" + _uri + "\"");
+		log("LanguageServer: File to be modified not opened \"" + to_string(_uri) + "\"");
 		return;
 	}
 
@@ -187,9 +184,9 @@ void LanguageServer::documentContentUpdated(string const& _uri, optional<int> _v
 	validate(*file);
 }
 
-void LanguageServer::documentClosed(string const& _uri)
+void LanguageServer::documentClosed(URI const& _uri)
 {
-	log("LanguageServer: didClose: " + _uri);
+	log("LanguageServer: didClose: " + to_string(_uri));
 }
 
 void LanguageServer::validateAll()
@@ -230,7 +227,7 @@ void LanguageServer::compile(::lsp::vfs::File const& _file)
 	// always start fresh when compiling
 	m_sourceCodes.clear();
 
-	m_sourceCodes[_file.uri().substr(7)] = _file.contentString();
+	m_sourceCodes[_file.uri().path] = _file.contentString();
 
 	m_fileReader = make_unique<FileReader>(m_basePath, m_allowedDirectories);
 
@@ -294,7 +291,7 @@ void LanguageServer::validate(::lsp::vfs::File const& _file)
 			auto related = ::lsp::DiagnosticRelatedInformation{};
 
 			related.message = secondary.message;
-			related.location.uri = "file://" + secondary.sourceName; // is the sourceName always a fully qualified path?
+			related.location.uri = URI::parse("file://" + secondary.sourceName).value(); // is the sourceName always a fully qualified path?
 			related.location.range.start.line = secondary.position.line;
 			related.location.range.start.column = secondary.startColumn;
 			related.location.range.end.line = secondary.position.line; // what about multiline?
@@ -346,7 +343,7 @@ std::vector<::lsp::Location> LanguageServer::gotoDefinition(::lsp::DocumentPosit
 	// source should be compiled already
 	solAssert(m_compilerStack.get() != nullptr, "");
 
-	auto const sourceName = file->uri().substr(7); // strip "file://"
+	auto const sourceName = file->uri().path;
 	auto const sourceNode = findASTNode(_location.position, sourceName);
 	if (!sourceNode)
 	{
@@ -366,7 +363,7 @@ std::vector<::lsp::Location> LanguageServer::gotoDefinition(::lsp::DocumentPosit
 		}
 
 		::lsp::Location output{};
-		output.uri = "file://" + fpm->second;
+		output.uri = URI::parse("file://" + fpm->second).value();
 		return {output};
 	}
 	else if (auto const n = dynamic_cast<frontend::MemberAccess const*>(sourceNode))
@@ -417,9 +414,9 @@ optional<::lsp::Location> LanguageServer::declarationPosition(frontend::Declarat
 
 	auto output = ::lsp::Location{};
 	if (auto fullPath = m_fileReader->fullPathMapping().find(sourceName); fullPath != m_fileReader->fullPathMapping().end())
-		output.uri = "file://" + fullPath->second;
+		output.uri = URI::parse("file://" + fullPath->second).value();
 	else
-		output.uri = "file://" + sourceName;
+		output.uri = URI::parse("file://" + sourceName).value();
 
 	output.range = {
 		{startLine, startColumn},
@@ -448,7 +445,7 @@ void LanguageServer::findAllReferences(
 	frontend::Declaration const* _declaration,
 	string const& _sourceIdentifierName,
 	frontend::SourceUnit const& _sourceUnit,
-	std::string const& _sourceUnitUri,
+	URI const& _sourceUnitUri,
 	std::vector<::lsp::Location>& _output
 )
 {
@@ -466,7 +463,7 @@ vector<::lsp::Location> LanguageServer::references(::lsp::DocumentPosition _docu
 {
 	trace(
 		"find all references: "s +
-		_documentPosition.uri + ":" +
+		to_string(_documentPosition.uri) + ":" +
 		to_string(_documentPosition.position.line) + ":" +
 		to_string(_documentPosition.position.column)
 	);
@@ -474,7 +471,7 @@ vector<::lsp::Location> LanguageServer::references(::lsp::DocumentPosition _docu
 	auto const file = m_vfs.find(_documentPosition.uri);
 	if (!file)
 	{
-		trace("File does not exist. "s + _documentPosition.uri);
+		trace("File does not exist. "s + to_string(_documentPosition.uri));
 		return {};
 	}
 
@@ -483,7 +480,7 @@ vector<::lsp::Location> LanguageServer::references(::lsp::DocumentPosition _docu
 
 	solAssert(m_compilerStack.get() != nullptr, "");
 
-	auto const sourceName = file->uri().substr(7); // strip "file://"
+	auto const sourceName = file->uri().path;
 
 	auto const sourceNode = findASTNode(_documentPosition.position, sourceName);
 	if (!sourceNode)
@@ -495,7 +492,7 @@ vector<::lsp::Location> LanguageServer::references(::lsp::DocumentPosition _docu
 	auto output = vector<::lsp::Location>{};
 	if (auto const sourceIdentifier = dynamic_cast<Identifier const*>(sourceNode))
 	{
-		auto const sourceName = _documentPosition.uri.substr(7); // strip "file://"
+		auto const sourceName = _documentPosition.uri.path;
 		frontend::SourceUnit const& sourceUnit = m_compilerStack->ast(sourceName);
 
 		if (auto decl = sourceIdentifier->annotation().referencedDeclaration)
@@ -508,13 +505,13 @@ vector<::lsp::Location> LanguageServer::references(::lsp::DocumentPosition _docu
 	}
 	else if (auto const varDecl = dynamic_cast<VariableDeclaration const*>(sourceNode))
 	{
-		auto const sourceName = _documentPosition.uri.substr(7); // strip "file://"
+		auto const sourceName = _documentPosition.uri.path;
 		frontend::SourceUnit const& sourceUnit = m_compilerStack->ast(sourceName);
 		findAllReferences(varDecl, sourceUnit, _documentPosition.uri, output);
 	}
 	else if (auto const memberAccess = dynamic_cast<MemberAccess const*>(sourceNode))
 	{
-		auto const sourceName = _documentPosition.uri.substr(7); // strip "file://"
+		auto const sourceName = _documentPosition.uri.path;
 		frontend::SourceUnit const& sourceUnit = m_compilerStack->ast(sourceName);
 		findAllReferences(varDecl, sourceUnit, _documentPosition.uri, output);
 	}
@@ -537,7 +534,7 @@ vector<::lsp::DocumentHighlight> LanguageServer::semanticHighlight(::lsp::Docume
 	compile(*file);
 	solAssert(m_compilerStack.get() != nullptr, "");
 
-	auto const sourceName = file->uri().substr(7); // strip "file://"
+	auto const sourceName = file->uri().path;
 
 	auto const sourceNode = findASTNode(_documentPosition.position, sourceName);
 	if (!sourceNode)
@@ -557,7 +554,7 @@ vector<::lsp::DocumentHighlight> LanguageServer::semanticHighlight(::lsp::Docume
 	// TODO: ImportDirective: hovering a symbol of an import directive should highlight all uses of that symbol.
 	if (auto const* sourceIdentifier = dynamic_cast<Identifier const*>(sourceNode))
 	{
-		auto const sourceName = _documentPosition.uri.substr(7); // strip "file://"
+		auto const sourceName = _documentPosition.uri.path;
 		frontend::SourceUnit const& sourceUnit = m_compilerStack->ast(sourceName);
 
 		vector<::lsp::DocumentHighlight> output;
@@ -575,7 +572,7 @@ vector<::lsp::DocumentHighlight> LanguageServer::semanticHighlight(::lsp::Docume
 	}
 	else if (auto const* varDecl = dynamic_cast<VariableDeclaration const*>(sourceNode))
 	{
-		auto const sourceName = _documentPosition.uri.substr(7); // strip "file://"
+		auto const sourceName = _documentPosition.uri.path;
 		frontend::SourceUnit const& sourceUnit = m_compilerStack->ast(sourceName);
 		output = findAllReferences(varDecl, sourceUnit);
 	}
@@ -586,7 +583,7 @@ vector<::lsp::DocumentHighlight> LanguageServer::semanticHighlight(::lsp::Docume
 		{
 			auto const memberName = memberAccess->memberName();
 
-			auto const sourceName = _documentPosition.uri.substr(7); // strip "file://"
+			auto const sourceName = _documentPosition.uri.path;
 			frontend::SourceUnit const& sourceUnit = m_compilerStack->ast(sourceName);
 
 			if (auto const* enumType = dynamic_cast<EnumType const*>(ttype->actualType()))
