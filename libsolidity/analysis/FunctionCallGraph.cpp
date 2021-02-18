@@ -18,14 +18,16 @@
 
 #include <libsolidity/analysis/FunctionCallGraph.h>
 
+#include <libsolutil/StringUtils.h>
+
 #include <range/v3/range/conversion.hpp>
-#include <range/v3/view/join.hpp>
 #include <range/v3/view/reverse.hpp>
 #include <range/v3/view/transform.hpp>
 
 using namespace std;
 using namespace ranges;
 using namespace solidity::frontend;
+using namespace solidity::util;
 
 bool FunctionCallGraphBuilder::CompareByID::operator()(Node const& _lhs, Node const& _rhs) const
 {
@@ -307,7 +309,6 @@ ostream& solidity::frontend::operator<<(ostream& _out, FunctionCallGraphBuilder:
 
 		auto typeToString = [](auto const& _var) -> string { return _var->type()->toString(true); };
 		vector<string> parameters = callableDeclaration->parameters() | views::transform(typeToString) | to<vector<string>>();
-		string joinedParameters = parameters | views::join(',') | to<string>();
 
 		string scopeName;
 		if (!function || !function->isFree())
@@ -319,7 +320,7 @@ ostream& solidity::frontend::operator<<(ostream& _out, FunctionCallGraphBuilder:
 		}
 
 		if (function && function->isFree())
-			_out << "function " << function->name() << "(" << joinedParameters << ")";
+			_out << "function " << function->name() << "(" << joinHumanReadable(parameters, ",") << ")";
 		else if (function && function->isConstructor())
 			_out << "constructor of " << scopeName;
 		else if (function && function->isFallback())
@@ -327,9 +328,9 @@ ostream& solidity::frontend::operator<<(ostream& _out, FunctionCallGraphBuilder:
 		else if (function && function->isReceive())
 			_out << "receive of " << scopeName;
 		else if (function)
-			_out << "function " << scopeName << "." << function->name() << "(" << joinedParameters << ")";
+			_out << "function " << scopeName << "." << function->name() << "(" << joinHumanReadable(parameters, ",") << ")";
 		else if (event)
-			_out << "event " << scopeName << "." << event->name() << "(" << joinedParameters << ")";
+			_out << "event " << scopeName << "." << event->name() << "(" << joinHumanReadable(parameters, ",") << ")";
 		else if (modifier)
 			_out << "modifier " << scopeName << "." << modifier->name();
 		else
