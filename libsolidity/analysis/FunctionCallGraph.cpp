@@ -284,21 +284,20 @@ ostream& solidity::frontend::operator<<(ostream& _out, FunctionCallGraphBuilder:
 	using SpecialNode = FunctionCallGraphBuilder::SpecialNode;
 
 	if (holds_alternative<SpecialNode>(_node))
-	{
-		auto specialNode = get<SpecialNode>(_node);
-		switch (specialNode)
+		switch (get<SpecialNode>(_node))
 		{
 			case SpecialNode::InternalDispatch:
-				_out<< "InternalDispatch";
+				_out << "InternalDispatch";
 				break;
 			case SpecialNode::Entry:
-				_out<< "Entry";
+				_out << "Entry";
 				break;
 			default: solAssert(false, "Invalid SpecialNode type");
 		}
-	}
 	else
 	{
+		solAssert(holds_alternative<CallableDeclaration const*>(_node), "");
+
 		auto const* callableDeclaration = get<CallableDeclaration const*>(_node);
 		solAssert(callableDeclaration, "");
 
@@ -330,9 +329,9 @@ ostream& solidity::frontend::operator<<(ostream& _out, FunctionCallGraphBuilder:
 		else if (function)
 			_out << "function " << scopeName << "." << function->name() << "(" << joinedParameters << ")";
 		else if (event)
-			_out<< "event " << scopeName << "." << event->name() << "(" << joinedParameters << ")";
+			_out << "event " << scopeName << "." << event->name() << "(" << joinedParameters << ")";
 		else if (modifier)
-			_out<< "modifier " << scopeName << "." << modifier->name();
+			_out << "modifier " << scopeName << "." << modifier->name();
 		else
 			solAssert(false, "Unexpected AST node type in function call graph");
 	}
