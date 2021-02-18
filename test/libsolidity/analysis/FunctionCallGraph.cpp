@@ -141,7 +141,7 @@ void checkCallGraphExpectations(
 	soltestAssert(
 		(_expectedEdges | views::keys | to<set>()) == (_callGraphs | views::keys | to<set>()) &&
 		(ranges::views::set_difference(_expectedCreatedContractSets | views::keys, _expectedEdges | views::keys)).empty(),
-		"Contracts listed in expectations do not match contracts actually found in the source file or other expectations."
+		"Contracts listed in expectations do not match contracts actually found in the source file or in other expectations."
 	);
 	for (string const& contractName: _expectedEdges | views::keys)
 		soltestAssert(
@@ -789,16 +789,22 @@ BOOST_AUTO_TEST_CASE(inherited_functions_virtual_and_super)
 			function f() internal {}
 			function g() internal virtual {}
 			function h() internal virtual {}
+
+			function ext() external virtual {}
 		}
 
 		contract D {
 			function h() internal virtual {}
+
+			function ext() external virtual {}
 		}
 
 		contract E is C, D {
 			function g() internal override {}
 			function h() internal override(C, D) {}
 			function i() internal {}
+
+			function ext() external override(C, D) {}
 
 			function callF() external { f(); }
 			function callG() external { g(); }
@@ -823,8 +829,12 @@ BOOST_AUTO_TEST_CASE(inherited_functions_virtual_and_super)
 	};
 
 	map<string, EdgeNames> expectedDeployedEdges = {
-		{"C", {}},
-		{"D", {}},
+		{"C", {
+			{"Entry", "function C.ext()"},
+		}},
+		{"D", {
+			{"Entry", "function D.ext()"},
+		}},
 		{"E", {
 			{"Entry", "function E.callF()"},
 			{"Entry", "function E.callG()"},
@@ -838,6 +848,7 @@ BOOST_AUTO_TEST_CASE(inherited_functions_virtual_and_super)
 			{"Entry", "function E.callSuperF()"},
 			{"Entry", "function E.callSuperG()"},
 			{"Entry", "function E.callSuperH()"},
+			{"Entry", "function E.ext()"},
 			{"function E.callF()", "function C.f()"},
 			{"function E.callG()", "function E.g()"},
 			{"function E.callH()", "function E.h()"},
@@ -1788,6 +1799,7 @@ BOOST_AUTO_TEST_CASE(fallback_and_receive)
 				(bool success, bytes memory result) = address(this).call("abc");
 			}
 		}
+
 		contract E is C {}
 	)"s);
 	tuple<CallGraphMap, CallGraphMap> graphs = collectGraphs(*compilerStack);
@@ -1816,6 +1828,58 @@ BOOST_AUTO_TEST_CASE(fallback_and_receive)
 			{"Entry", "receive of C"},
 			{"fallback of C", "function C.inr()"},
 			{"receive of C", "function C.inr()"},
+		}},
+	};
+
+	checkCallGraphExpectations(get<0>(graphs), expectedCreationEdges);
+	checkCallGraphExpectations(get<1>(graphs), expectedDeployedEdges);
+}
+
+BOOST_AUTO_TEST_CASE(virtual_fallback_and_receive)
+{
+	unique_ptr<CompilerStack> compilerStack = parseAndAnalyzeContracts(R"(
+		contract C {
+			fallback() external virtual {}
+			receive() external payable virtual {}
+		}
+
+		contract D is C {}
+
+		contract E is D {
+			fallback() external virtual override {}
+			receive() external payable virtual override {}
+		}
+
+		contract F is E {
+			fallback() external override {}
+			receive() external payable override {}
+		}
+	)"s);
+	tuple<CallGraphMap, CallGraphMap> graphs = collectGraphs(*compilerStack);
+
+	map<string, EdgeNames> expectedCreationEdges = {
+		{"C", {}},
+		{"D", {}},
+		{"E", {}},
+		{"F", {}},
+	};
+
+	map<string, EdgeNames> expectedDeployedEdges = {
+		{"C", {
+			{"Entry", "receive of C"},
+			{"Entry", "fallback of C"},
+		}},
+		{"D", {
+			{"Entry", "receive of C"},
+			{"Entry", "fallback of C"},
+		}},
+		{"E", {
+			{"Entry", "receive of E"},
+			{"Entry", "fallback of E"},
+		}},
+		{"F", {
+			{"Entry", "receive of F"},
+			{"Entry", "fallback of F"},
 		}},
 	};
 
