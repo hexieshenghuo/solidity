@@ -59,7 +59,7 @@ public:
 
 	void verifyCallGraphs(
 		FunctionCallGraphBuilder::ContractCallGraph const& _creationGraph,
-		FunctionCallGraphBuilder::ContractCallGraph const& _deploymentGraph
+		FunctionCallGraphBuilder::ContractCallGraph const& _deployedGraph
 	);
 
 private:

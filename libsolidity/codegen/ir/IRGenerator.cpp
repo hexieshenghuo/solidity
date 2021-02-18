@@ -126,7 +126,7 @@ pair<string, string> IRGenerator::run(
 
 void IRGenerator::verifyCallGraphs(
 	FunctionCallGraphBuilder::ContractCallGraph const& _creationGraph,
-	FunctionCallGraphBuilder::ContractCallGraph const& _deploymentGraph
+	FunctionCallGraphBuilder::ContractCallGraph const& _deployedGraph
 )
 {
 	set<CallableDeclaration const*, ASTNode::CompareByID> reachableCallables;
@@ -140,8 +140,8 @@ void IRGenerator::verifyCallGraphs(
 	m_creationFunctionList = {};
 
 	reachableCallables.clear();
-	collectReachableCallables(_deploymentGraph, FunctionCallGraphBuilder::SpecialNode::Entry, reachableCallables);
-	collectReachableCallables(_deploymentGraph, FunctionCallGraphBuilder::SpecialNode::InternalDispatch, reachableCallables);
+	collectReachableCallables(_deployedGraph, FunctionCallGraphBuilder::SpecialNode::Entry, reachableCallables);
+	collectReachableCallables(_deployedGraph, FunctionCallGraphBuilder::SpecialNode::InternalDispatch, reachableCallables);
 	verifyCallGraph(reachableCallables, move(m_deployedFunctionList));
 	m_deployedFunctionList = {};
 }
