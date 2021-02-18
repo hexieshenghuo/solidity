@@ -117,7 +117,7 @@ tuple<CallGraphMap, CallGraphMap> collectGraphs(CompilerStack const& _compilerSt
 		string contractName = fullyQualifiedContractName.substr(1);
 
 		get<0>(graphs).emplace(contractName, &_compilerStack.creationCallGraph(fullyQualifiedContractName));
-		get<1>(graphs).emplace(contractName, &_compilerStack.deploymentCallGraph(fullyQualifiedContractName));
+		get<1>(graphs).emplace(contractName, &_compilerStack.deployedCallGraph(fullyQualifiedContractName));
 	}
 
 	return graphs;
@@ -270,7 +270,7 @@ BOOST_AUTO_TEST_CASE(only_definitions)
 		{"L", {}},
 	};
 
-	map<string, EdgeNames> expectedDeploymentEdges = {
+	map<string, EdgeNames> expectedDeployedEdges = {
 		{"C", {
 			{"Entry", "function C.ext()"},
 			{"Entry", "function C.pub()"},
@@ -282,7 +282,7 @@ BOOST_AUTO_TEST_CASE(only_definitions)
 	};
 
 	checkCallGraphExpectations(get<0>(graphs), expectedCreationEdges);
-	checkCallGraphExpectations(get<1>(graphs), expectedDeploymentEdges);
+	checkCallGraphExpectations(get<1>(graphs), expectedDeployedEdges);
 }
 
 BOOST_AUTO_TEST_CASE(ordinary_calls)
@@ -311,7 +311,7 @@ BOOST_AUTO_TEST_CASE(ordinary_calls)
 		{"L", {}},
 	};
 
-	map<string, EdgeNames> expectedDeploymentEdges = {
+	map<string, EdgeNames> expectedDeployedEdges = {
 		{"C", {
 			{"Entry", "function C.ext()"},
 			{"Entry", "function C.pub()"},
@@ -337,7 +337,7 @@ BOOST_AUTO_TEST_CASE(ordinary_calls)
 	};
 
 	checkCallGraphExpectations(get<0>(graphs), expectedCreationEdges);
-	checkCallGraphExpectations(get<1>(graphs), expectedDeploymentEdges);
+	checkCallGraphExpectations(get<1>(graphs), expectedDeployedEdges);
 }
 
 BOOST_AUTO_TEST_CASE(call_chains_through_externals)
@@ -368,7 +368,7 @@ BOOST_AUTO_TEST_CASE(call_chains_through_externals)
 		{"L", {}},
 	};
 
-	map<string, EdgeNames> expectedDeploymentEdges = {
+	map<string, EdgeNames> expectedDeployedEdges = {
 		{"C", {
 			{"Entry", "function C.ext()"},
 			{"Entry", "function C.ext2()"},
@@ -383,7 +383,7 @@ BOOST_AUTO_TEST_CASE(call_chains_through_externals)
 	};
 
 	checkCallGraphExpectations(get<0>(graphs), expectedCreationEdges);
-	checkCallGraphExpectations(get<1>(graphs), expectedDeploymentEdges);
+	checkCallGraphExpectations(get<1>(graphs), expectedDeployedEdges);
 }
 
 BOOST_AUTO_TEST_CASE(calls_from_constructors)
@@ -426,7 +426,7 @@ BOOST_AUTO_TEST_CASE(calls_from_constructors)
 		{"L", {}},
 	};
 
-	map<string, EdgeNames> expectedDeploymentEdges = {
+	map<string, EdgeNames> expectedDeployedEdges = {
 		{"C", {
 			{"Entry", "function C.ext()"},
 		}},
@@ -439,7 +439,7 @@ BOOST_AUTO_TEST_CASE(calls_from_constructors)
 	};
 
 	checkCallGraphExpectations(get<0>(graphs), expectedCreationEdges);
-	checkCallGraphExpectations(get<1>(graphs), expectedDeploymentEdges);
+	checkCallGraphExpectations(get<1>(graphs), expectedDeployedEdges);
 }
 
 BOOST_AUTO_TEST_CASE(calls_to_constructors)
@@ -471,7 +471,7 @@ BOOST_AUTO_TEST_CASE(calls_to_constructors)
 		{"L", {}},
 	};
 
-	map<string, EdgeNames> expectedDeploymentEdges = {
+	map<string, EdgeNames> expectedDeployedEdges = {
 		{"C", {
 			{"Entry", "function C.ext()"},
 			{"function C.ext()", "function C.inr()"},
@@ -488,13 +488,13 @@ BOOST_AUTO_TEST_CASE(calls_to_constructors)
 	map<string, set<string>> expectedCreatedContractsAtCreation = {
 		{"C", {"D"}},
 	};
-	map<string, set<string>> expectedCreatedContractsAtDeployment = {
+	map<string, set<string>> expectedCreatedContractsAfterDeployment = {
 		{"C", {"D"}},
 		{"L", {"C", "D"}},
 	};
 
 	checkCallGraphExpectations(get<0>(graphs), expectedCreationEdges, expectedCreatedContractsAtCreation);
-	checkCallGraphExpectations(get<1>(graphs), expectedDeploymentEdges, expectedCreatedContractsAtDeployment);
+	checkCallGraphExpectations(get<1>(graphs), expectedDeployedEdges, expectedCreatedContractsAfterDeployment);
 }
 
 BOOST_AUTO_TEST_CASE(inherited_constructors)
@@ -583,7 +583,7 @@ BOOST_AUTO_TEST_CASE(inherited_constructors)
 		{"L", {}},
 	};
 
-	map<string, EdgeNames> expectedDeploymentEdges = {
+	map<string, EdgeNames> expectedDeployedEdges = {
 		{"C", {
 			{"Entry", "function C.extC()"},
 			{"function C.extC()", "function C.inrC()"},
@@ -626,12 +626,12 @@ BOOST_AUTO_TEST_CASE(inherited_constructors)
 	};
 
 	map<string, set<string>> expectedCreatedContractsAtCreation = {};
-	map<string, set<string>> expectedCreatedContractsAtDeployment = {
+	map<string, set<string>> expectedCreatedContractsAfterDeployment = {
 		{"G", {"F"}},
 	};
 
 	checkCallGraphExpectations(get<0>(graphs), expectedCreationEdges, expectedCreatedContractsAtCreation);
-	checkCallGraphExpectations(get<1>(graphs), expectedDeploymentEdges, expectedCreatedContractsAtDeployment);
+	checkCallGraphExpectations(get<1>(graphs), expectedDeployedEdges, expectedCreatedContractsAfterDeployment);
 }
 
 BOOST_AUTO_TEST_CASE(inheritance_specifiers)
@@ -688,7 +688,7 @@ BOOST_AUTO_TEST_CASE(inheritance_specifiers)
 		}},
 	};
 
-	map<string, EdgeNames> expectedDeploymentEdges = {
+	map<string, EdgeNames> expectedDeployedEdges = {
 		{"C", {}},
 		{"D", {}},
 		{"E", {}},
@@ -696,7 +696,7 @@ BOOST_AUTO_TEST_CASE(inheritance_specifiers)
 	};
 
 	checkCallGraphExpectations(get<0>(graphs), expectedCreationEdges);
-	checkCallGraphExpectations(get<1>(graphs), expectedDeploymentEdges);
+	checkCallGraphExpectations(get<1>(graphs), expectedDeployedEdges);
 }
 
 BOOST_AUTO_TEST_CASE(diamond_inheritance)
@@ -771,7 +771,7 @@ BOOST_AUTO_TEST_CASE(diamond_inheritance)
 		}},
 	};
 
-	map<string, EdgeNames> expectedDeploymentEdges = {
+	map<string, EdgeNames> expectedDeployedEdges = {
 		{"C", {}},
 		{"D", {}},
 		{"E", {}},
@@ -779,7 +779,7 @@ BOOST_AUTO_TEST_CASE(diamond_inheritance)
 	};
 
 	checkCallGraphExpectations(get<0>(graphs), expectedCreationEdges);
-	checkCallGraphExpectations(get<1>(graphs), expectedDeploymentEdges);
+	checkCallGraphExpectations(get<1>(graphs), expectedDeployedEdges);
 }
 
 BOOST_AUTO_TEST_CASE(inherited_functions_virtual_and_super)
@@ -822,7 +822,7 @@ BOOST_AUTO_TEST_CASE(inherited_functions_virtual_and_super)
 		{"E", {}},
 	};
 
-	map<string, EdgeNames> expectedDeploymentEdges = {
+	map<string, EdgeNames> expectedDeployedEdges = {
 		{"C", {}},
 		{"D", {}},
 		{"E", {
@@ -854,7 +854,7 @@ BOOST_AUTO_TEST_CASE(inherited_functions_virtual_and_super)
 	};
 
 	checkCallGraphExpectations(get<0>(graphs), expectedCreationEdges);
-	checkCallGraphExpectations(get<1>(graphs), expectedDeploymentEdges);
+	checkCallGraphExpectations(get<1>(graphs), expectedDeployedEdges);
 }
 
 BOOST_AUTO_TEST_CASE(overloaded_functions)
@@ -890,7 +890,7 @@ BOOST_AUTO_TEST_CASE(overloaded_functions)
 		{"D", {}},
 	};
 
-	map<string, EdgeNames> expectedDeploymentEdges = {
+	map<string, EdgeNames> expectedDeployedEdges = {
 		{"C", {
 			{"Entry", "function C.f(bool)"},
 		}},
@@ -912,7 +912,7 @@ BOOST_AUTO_TEST_CASE(overloaded_functions)
 	};
 
 	checkCallGraphExpectations(get<0>(graphs), expectedCreationEdges);
-	checkCallGraphExpectations(get<1>(graphs), expectedDeploymentEdges);
+	checkCallGraphExpectations(get<1>(graphs), expectedDeployedEdges);
 }
 
 BOOST_AUTO_TEST_CASE(modifiers)
@@ -970,7 +970,7 @@ BOOST_AUTO_TEST_CASE(modifiers)
 		}},
 	};
 
-	map<string, EdgeNames> expectedDeploymentEdges = {
+	map<string, EdgeNames> expectedDeployedEdges = {
 		{"C", {}},
 		{"D", {}},
 		{"L", {}},
@@ -994,10 +994,10 @@ BOOST_AUTO_TEST_CASE(modifiers)
 	};
 
 	map<string, set<string>> expectedCreatedContractsAtCreation = {{"E", {"C"}}};
-	map<string, set<string>> expectedCreatedContractsAtDeployment = {{"E", {"C"}}};
+	map<string, set<string>> expectedCreatedContractsAfterDeployment = {{"E", {"C"}}};
 
 	checkCallGraphExpectations(get<0>(graphs), expectedCreationEdges, expectedCreatedContractsAtCreation);
-	checkCallGraphExpectations(get<1>(graphs), expectedDeploymentEdges, expectedCreatedContractsAtDeployment);
+	checkCallGraphExpectations(get<1>(graphs), expectedDeployedEdges, expectedCreatedContractsAfterDeployment);
 }
 
 BOOST_AUTO_TEST_CASE(events)
@@ -1037,7 +1037,7 @@ BOOST_AUTO_TEST_CASE(events)
 		{"L", {}},
 	};
 
-	map<string, EdgeNames> expectedDeploymentEdges = {
+	map<string, EdgeNames> expectedDeployedEdges = {
 		{"C", {}},
 		{"D", {
 			{"Entry", "function D.ext()"},
@@ -1055,7 +1055,7 @@ BOOST_AUTO_TEST_CASE(events)
 	};
 
 	map<string, set<string>> expectedCreationEvents = {};
-	map<string, set<string>> expectedDeploymentEvents = {
+	map<string, set<string>> expectedDeployedEvents = {
 		{"D", {
 			"event D.EvD1(uint256)",
 			"event C.EvC(uint256)",
@@ -1068,7 +1068,7 @@ BOOST_AUTO_TEST_CASE(events)
 	};
 
 	checkCallGraphExpectations(get<0>(graphs), expectedCreationEdges, {}, expectedCreationEvents);
-	checkCallGraphExpectations(get<1>(graphs), expectedDeploymentEdges, {}, expectedDeploymentEvents);
+	checkCallGraphExpectations(get<1>(graphs), expectedDeployedEdges, {}, expectedDeployedEvents);
 }
 
 BOOST_AUTO_TEST_CASE(cycles)
@@ -1110,7 +1110,7 @@ BOOST_AUTO_TEST_CASE(cycles)
 		{"D", {}},
 	};
 
-	map<string, EdgeNames> expectedDeploymentEdges = {
+	map<string, EdgeNames> expectedDeployedEdges = {
 		{"L", {}},
 		{"C", {}},
 		{"D", {
@@ -1140,7 +1140,7 @@ BOOST_AUTO_TEST_CASE(cycles)
 	};
 
 	checkCallGraphExpectations(get<0>(graphs), expectedCreationEdges);
-	checkCallGraphExpectations(get<1>(graphs), expectedDeploymentEdges);
+	checkCallGraphExpectations(get<1>(graphs), expectedDeployedEdges);
 }
 
 BOOST_AUTO_TEST_CASE(interfaces_and_abstract_contracts)
@@ -1184,7 +1184,7 @@ BOOST_AUTO_TEST_CASE(interfaces_and_abstract_contracts)
 		{"D", {}},
 	};
 
-	map<string, EdgeNames> expectedDeploymentEdges = {
+	map<string, EdgeNames> expectedDeployedEdges = {
 		{"I", {
 			{"Entry", "function I.ext1()"},
 			{"Entry", "function I.ext2()"},
@@ -1217,7 +1217,7 @@ BOOST_AUTO_TEST_CASE(interfaces_and_abstract_contracts)
 	};
 
 	map<string, set<string>> expectedCreationEvents = {};
-	map<string, set<string>> expectedDeploymentEvents = {
+	map<string, set<string>> expectedDeployedEvents = {
 		{"D", {
 			"event I.Ev(uint256)",
 		}},
@@ -1225,7 +1225,7 @@ BOOST_AUTO_TEST_CASE(interfaces_and_abstract_contracts)
 
 
 	checkCallGraphExpectations(get<0>(graphs), expectedCreationEdges, {}, expectedCreationEvents);
-	checkCallGraphExpectations(get<1>(graphs), expectedDeploymentEdges, {}, expectedDeploymentEvents);
+	checkCallGraphExpectations(get<1>(graphs), expectedDeployedEdges, {}, expectedDeployedEvents);
 }
 
 BOOST_AUTO_TEST_CASE(indirect_calls)
@@ -1305,7 +1305,7 @@ BOOST_AUTO_TEST_CASE(indirect_calls)
 		}},
 	};
 
-	map<string, EdgeNames> expectedDeploymentEdges = {
+	map<string, EdgeNames> expectedDeployedEdges = {
 		{"L", {
 			{"InternalDispatch", "function L.inr1()"},
 			{"InternalDispatch", "function L.inr2()"},
@@ -1348,7 +1348,7 @@ BOOST_AUTO_TEST_CASE(indirect_calls)
 	};
 
 	checkCallGraphExpectations(get<0>(graphs), expectedCreationEdges);
-	checkCallGraphExpectations(get<1>(graphs), expectedDeploymentEdges);
+	checkCallGraphExpectations(get<1>(graphs), expectedDeployedEdges);
 }
 
 BOOST_AUTO_TEST_CASE(calls_via_pointers)
@@ -1469,7 +1469,7 @@ BOOST_AUTO_TEST_CASE(calls_via_pointers)
 		}},
 	};
 
-	map<string, EdgeNames> expectedDeploymentEdges = {
+	map<string, EdgeNames> expectedDeployedEdges = {
 		{"L", {}},
 		{"C", {
 			{"InternalDispatch", "function C.inr2()"},
@@ -1508,7 +1508,7 @@ BOOST_AUTO_TEST_CASE(calls_via_pointers)
 	};
 
 	checkCallGraphExpectations(get<0>(graphs), expectedCreationEdges);
-	checkCallGraphExpectations(get<1>(graphs), expectedDeploymentEdges);
+	checkCallGraphExpectations(get<1>(graphs), expectedDeployedEdges);
 }
 
 BOOST_AUTO_TEST_CASE(pointer_to_overridden_function)
@@ -1545,7 +1545,7 @@ BOOST_AUTO_TEST_CASE(pointer_to_overridden_function)
 		{"D", {}},
 	};
 
-	map<string, EdgeNames> expectedDeploymentEdges = {
+	map<string, EdgeNames> expectedDeployedEdges = {
 		{"C", {}},
 		{"D", {
 			{"InternalDispatch", "function C.f()"},
@@ -1559,7 +1559,7 @@ BOOST_AUTO_TEST_CASE(pointer_to_overridden_function)
 	};
 
 	checkCallGraphExpectations(get<0>(graphs), expectedCreationEdges);
-	checkCallGraphExpectations(get<1>(graphs), expectedDeploymentEdges);
+	checkCallGraphExpectations(get<1>(graphs), expectedDeployedEdges);
 }
 
 BOOST_AUTO_TEST_CASE(pointer_to_nonexistent_function)
@@ -1599,7 +1599,7 @@ BOOST_AUTO_TEST_CASE(pointer_to_nonexistent_function)
 		{"D", {}},
 	};
 
-	map<string, EdgeNames> expectedDeploymentEdges = {
+	map<string, EdgeNames> expectedDeployedEdges = {
 		{"I", {
 			{"Entry", "function I.f()"},
 			  }},
@@ -1626,7 +1626,7 @@ BOOST_AUTO_TEST_CASE(pointer_to_nonexistent_function)
 	};
 
 	checkCallGraphExpectations(get<0>(graphs), expectedCreationEdges);
-	checkCallGraphExpectations(get<1>(graphs), expectedDeploymentEdges);
+	checkCallGraphExpectations(get<1>(graphs), expectedDeployedEdges);
 }
 
 BOOST_AUTO_TEST_CASE(function_self_reference)
@@ -1644,7 +1644,7 @@ BOOST_AUTO_TEST_CASE(function_self_reference)
 		{"C", {}},
 	};
 
-	map<string, EdgeNames> expectedDeploymentEdges = {
+	map<string, EdgeNames> expectedDeployedEdges = {
 		{"C", {
 			{"Entry", "function C.f()"},
 			{"InternalDispatch", "function C.f()"},
@@ -1652,7 +1652,7 @@ BOOST_AUTO_TEST_CASE(function_self_reference)
 	};
 
 	checkCallGraphExpectations(get<0>(graphs), expectedCreationEdges);
-	checkCallGraphExpectations(get<1>(graphs), expectedDeploymentEdges);
+	checkCallGraphExpectations(get<1>(graphs), expectedDeployedEdges);
 }
 
 BOOST_AUTO_TEST_CASE(pointer_cycle)
@@ -1676,7 +1676,7 @@ BOOST_AUTO_TEST_CASE(pointer_cycle)
 		}},
 	};
 
-	map<string, EdgeNames> expectedDeploymentEdges = {
+	map<string, EdgeNames> expectedDeployedEdges = {
 		{"C", {
 			{"InternalDispatch", "function C.f()"},
 			{"Entry", "function C.test()"},
@@ -1687,7 +1687,7 @@ BOOST_AUTO_TEST_CASE(pointer_cycle)
 	tuple<CallGraphMap, CallGraphMap> graphs = collectGraphs(*compilerStack);
 
 	checkCallGraphExpectations(get<0>(graphs), expectedCreationEdges);
-	checkCallGraphExpectations(get<1>(graphs), expectedDeploymentEdges);
+	checkCallGraphExpectations(get<1>(graphs), expectedDeployedEdges);
 }
 
 BOOST_AUTO_TEST_CASE(using_for)
@@ -1720,7 +1720,7 @@ BOOST_AUTO_TEST_CASE(using_for)
 		{"C", {}},
 	};
 
-	map<string, EdgeNames> expectedDeploymentEdges = {
+	map<string, EdgeNames> expectedDeployedEdges = {
 		{"L", {
 			{"Entry", "function L.ext(struct S)"},
 		}},
@@ -1731,7 +1731,7 @@ BOOST_AUTO_TEST_CASE(using_for)
 	};
 
 	checkCallGraphExpectations(get<0>(graphs), expectedCreationEdges);
-	checkCallGraphExpectations(get<1>(graphs), expectedDeploymentEdges);
+	checkCallGraphExpectations(get<1>(graphs), expectedDeployedEdges);
 }
 
 BOOST_AUTO_TEST_CASE(getters)
@@ -1755,12 +1755,12 @@ BOOST_AUTO_TEST_CASE(getters)
 		{"C", {}},
 	};
 
-	map<string, EdgeNames> expectedDeploymentEdges = {
+	map<string, EdgeNames> expectedDeployedEdges = {
 		{"C", {{"Entry", "function C.test()"}}},
 	};
 
 	checkCallGraphExpectations(get<0>(graphs), expectedCreationEdges);
-	checkCallGraphExpectations(get<1>(graphs), expectedDeploymentEdges);
+	checkCallGraphExpectations(get<1>(graphs), expectedDeployedEdges);
 }
 
 BOOST_AUTO_TEST_CASE(fallback_and_receive)
@@ -1798,7 +1798,7 @@ BOOST_AUTO_TEST_CASE(fallback_and_receive)
 		{"E", {}},
 	};
 
-	map<string, EdgeNames> expectedDeploymentEdges = {
+	map<string, EdgeNames> expectedDeployedEdges = {
 		{"C", {
 			{"Entry", "function C.ext()"},
 			{"Entry", "receive of C"},
@@ -1820,7 +1820,7 @@ BOOST_AUTO_TEST_CASE(fallback_and_receive)
 	};
 
 	checkCallGraphExpectations(get<0>(graphs), expectedCreationEdges);
-	checkCallGraphExpectations(get<1>(graphs), expectedDeploymentEdges);
+	checkCallGraphExpectations(get<1>(graphs), expectedDeployedEdges);
 }
 
 BOOST_AUTO_TEST_CASE(builtins)
@@ -1907,7 +1907,7 @@ BOOST_AUTO_TEST_CASE(builtins)
 		{"C", {}},
 	};
 
-	map<string, EdgeNames> expectedDeploymentEdges = {
+	map<string, EdgeNames> expectedDeployedEdges = {
 		{"I", {}},
 		{"C", {
 			{"Entry", "function C.accessBuiltin()"},
@@ -1916,7 +1916,7 @@ BOOST_AUTO_TEST_CASE(builtins)
 	};
 
 	checkCallGraphExpectations(get<0>(graphs), expectedCreationEdges);
-	checkCallGraphExpectations(get<1>(graphs), expectedDeploymentEdges);
+	checkCallGraphExpectations(get<1>(graphs), expectedDeployedEdges);
 }
 
 BOOST_AUTO_TEST_CASE(conversions_and_struct_array_constructors)
@@ -1971,7 +1971,7 @@ BOOST_AUTO_TEST_CASE(conversions_and_struct_array_constructors)
 		{"C", {}},
 	};
 
-	map<string, EdgeNames> expectedDeploymentEdges = {
+	map<string, EdgeNames> expectedDeployedEdges = {
 		{"I", {}},
 		{"C", {
 			{"Entry", "function C.convert()"},
@@ -1981,7 +1981,7 @@ BOOST_AUTO_TEST_CASE(conversions_and_struct_array_constructors)
 	};
 
 	checkCallGraphExpectations(get<0>(graphs), expectedCreationEdges);
-	checkCallGraphExpectations(get<1>(graphs), expectedDeploymentEdges);
+	checkCallGraphExpectations(get<1>(graphs), expectedDeployedEdges);
 }
 
 BOOST_AUTO_TEST_SUITE_END()
