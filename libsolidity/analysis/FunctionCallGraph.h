@@ -33,13 +33,14 @@ namespace solidity::frontend
 /**
  * Creates a Function call graph for a contract at the granularity of Solidity
  * functions and modifiers. The graph can represent the situation either at contract creation
- * or at deployment time.
+ * or after deployment. The graph does not preserve temporal relations between calls - edges
+ * coming out of the same node show which calls were performed but not in what order.
  *
  * Includes the following special nodes:
  *  - Entry: represents a call from the outside of the contract.
- *    At deployment this is the node that connects to all the functions exposed through the external
- *    interface. At contract creation it connects to the constructor and variable initializers in
- *    the bottom-most contract in the linearized inheritance order.
+ *    After deployment this is the node that connects to all the functions exposed through the
+ *    external interface. At contract creation it connects to the constructor and variable
+ *    initializers in the bottom-most contract in the linearized inheritance order.
  *  - InternalDispatch: Represents the internal dispatch function, which calls internal functions
  *    determined at runtime by values of variables and expressions. Functions that are not called
  *    right away get an edge from this node.
@@ -49,7 +50,8 @@ namespace solidity::frontend
  *  emitted events and created contracts are gathered in separate sets included in the graph just
  *  for that purpose.
  *
- *  Auto-generated getter functions for public state variables are ignored.
+ *  Auto-generated getter functions for public state variables are ignored, but function calls
+ *  inside initial assignments are included in the creation graph.
  *
  *  Only calls reachable from an Entry node are included in the graph.
  */
@@ -78,6 +80,9 @@ public:
 		/// Contract for which this is the graph
 		ContractDefinition const& contract;
 
+		/// Graph edges. Edges are directed and lead from the caller to the callee.
+		/// The map contains a key for every possible caller, even if does not actually perform
+		/// any calls.
 		std::map<Node, std::set<Node, CompareByID>, CompareByID> edges;
 
 		/// Contracts that may get created with `new` by functions present in the graph.

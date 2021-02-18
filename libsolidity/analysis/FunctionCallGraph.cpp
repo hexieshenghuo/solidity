@@ -111,7 +111,7 @@ unique_ptr<FunctionCallGraphBuilder::ContractCallGraph> FunctionCallGraphBuilder
 		builder.functionReferenced(*_contract.receiveFunction());
 
 	// All functions present in internal dispatch at creation time could potentially be pointers
-	// assigned to state variables and as such may be reachable at deployment time as well.
+	// assigned to state variables and as such may be reachable after deployment as well.
 	builder.m_currentNode = SpecialNode::InternalDispatch;
 	for (Node const& dispatchTarget: valueOrDefault(_creationGraph.edges, SpecialNode::InternalDispatch, {}))
 	{
