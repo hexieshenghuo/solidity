@@ -257,9 +257,9 @@ void FunctionCallGraphBuilder::processQueue()
 	m_currentNode = SpecialNode::Entry;
 }
 
-bool FunctionCallGraphBuilder::add(Node _caller, Node _callee)
+void FunctionCallGraphBuilder::add(Node _caller, Node _callee)
 {
-	return m_graph.edges[_caller].insert(_callee).second;
+	m_graph.edges[_caller].insert(_callee);
 }
 
 void FunctionCallGraphBuilder::functionReferenced(CallableDeclaration const& _callable, bool _calledDirectly)

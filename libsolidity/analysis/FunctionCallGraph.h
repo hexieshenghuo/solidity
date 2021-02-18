@@ -113,7 +113,7 @@ private:
 	void enqueueCallable(CallableDeclaration const& _callable);
 	void processQueue();
 
-	bool add(Node _caller, Node _callee);
+	void add(Node _caller, Node _callee);
 	void functionReferenced(CallableDeclaration const& _callable, bool _calledDirectly = true);
 
 	Node m_currentNode = SpecialNode::Entry;
