@@ -144,10 +144,13 @@ void checkCallGraphExpectations(
 		"Contracts listed in expectations do not match contracts actually found in the source file or in other expectations."
 	);
 	for (string const& contractName: _expectedEdges | views::keys)
+	{
+		set<string> emptySet;
 		soltestAssert(
-			(ranges::views::set_difference(valueOrDefault(_expectedCreatedContractSets, contractName, {}), _expectedEdges | views::keys)).empty(),
+			(ranges::views::set_difference(valueOrDefault(_expectedCreatedContractSets, contractName, emptySet), _expectedEdges | views::keys)).empty(),
 			"Inconsistent expectations: contract expected to be created but not to be present in the source file."
 		);
+	}
 
 	map<string, EdgeNames> edges;
 	map<string, set<string>> createdContractSets;
