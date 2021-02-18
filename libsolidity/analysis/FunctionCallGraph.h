@@ -58,7 +58,8 @@ namespace solidity::frontend
 class FunctionCallGraphBuilder: private ASTConstVisitor
 {
 public:
-	enum class SpecialNode {
+	enum class SpecialNode
+	{
 		InternalDispatch,
 		Entry,
 	};

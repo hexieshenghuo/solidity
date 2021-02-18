@@ -54,6 +54,7 @@ bool FunctionCallGraphBuilder::CompareByID::operator()(int64_t _lhs, Node const&
 unique_ptr<FunctionCallGraphBuilder::ContractCallGraph> FunctionCallGraphBuilder::buildCreationGraph(ContractDefinition const& _contract)
 {
 	FunctionCallGraphBuilder builder(_contract);
+	solAssert(builder.m_currentNode == Node(SpecialNode::Entry), "");
 
 	// Create graph for constructor, state vars, etc
 	for (ContractDefinition const* base: _contract.annotation().linearizedBaseContracts | views::reverse)
@@ -88,6 +89,7 @@ unique_ptr<FunctionCallGraphBuilder::ContractCallGraph> FunctionCallGraphBuilder
 	solAssert(&_creationGraph.contract == &_contract, "");
 
 	FunctionCallGraphBuilder builder(_contract);
+	solAssert(builder.m_currentNode == Node(SpecialNode::Entry), "");
 
 	auto getSecondElement = [](auto const& _tuple){ return get<1>(_tuple); };
 
@@ -117,7 +119,6 @@ unique_ptr<FunctionCallGraphBuilder::ContractCallGraph> FunctionCallGraphBuilder
 	{
 		solAssert(!holds_alternative<SpecialNode>(dispatchTarget), "");
 		solAssert(get<CallableDeclaration const*>(dispatchTarget) != nullptr, "");
-		solAssert(dynamic_cast<CallableDeclaration const*>(get<CallableDeclaration const*>(dispatchTarget)) != nullptr, "");
 
 		// Visit the callable to add not only it but also everything it calls too
 		builder.functionReferenced(*get<CallableDeclaration const*>(dispatchTarget), false);
@@ -131,8 +132,6 @@ unique_ptr<FunctionCallGraphBuilder::ContractCallGraph> FunctionCallGraphBuilder
 
 bool FunctionCallGraphBuilder::visit(FunctionCall const& _functionCall)
 {
-	solAssert(holds_alternative<SpecialNode>(m_currentNode) || get<CallableDeclaration const*>(m_currentNode) != nullptr, "");
-
 	if (*_functionCall.annotation().kind != FunctionCallKind::FunctionCall)
 		return true;
 
@@ -156,7 +155,7 @@ bool FunctionCallGraphBuilder::visit(EmitStatement const& _emitStatement)
 	auto const* functionType = dynamic_cast<FunctionType const*>(_emitStatement.eventCall().expression().annotation().type);
 	solAssert(functionType, "");
 
-	m_graph.emittedEvents.insert(dynamic_cast<EventDefinition const*>(&functionType->declaration()));
+	m_graph.emittedEvents.insert(&dynamic_cast<EventDefinition const&>(functionType->declaration()));
 
 	return true;
 }
@@ -199,32 +198,31 @@ void FunctionCallGraphBuilder::endVisit(MemberAccess const& _memberAccess)
 			if (auto const contractType = dynamic_cast<ContractType const*>(typeType->actualType()))
 			{
 				solAssert(contractType->isSuper(), "");
-				functionDef =
-					&functionDef->resolveVirtual(
-						m_graph.contract,
-						contractType->contractDefinition().superContract(m_graph.contract)
-					);
+				functionDef = &functionDef->resolveVirtual(
+					m_graph.contract,
+					contractType->contractDefinition().superContract(m_graph.contract)
+				);
 			}
 	}
 	else
 		solAssert(*_memberAccess.annotation().requiredLookup == VirtualLookup::Static, "");
 
 	functionReferenced(*functionDef, _memberAccess.annotation().calledDirectly);
-	return;
 }
 
 void FunctionCallGraphBuilder::endVisit(ModifierInvocation const& _modifierInvocation)
 {
-	VirtualLookup const& requiredLookup = *_modifierInvocation.name().annotation().requiredLookup;
-
 	if (auto const* modifier = dynamic_cast<ModifierDefinition const*>(_modifierInvocation.name().annotation().referencedDeclaration))
 	{
-		if (requiredLookup == VirtualLookup::Virtual)
-			modifier = &modifier->resolveVirtual(m_graph.contract);
-		else
-			solAssert(requiredLookup == VirtualLookup::Static, "");
+		VirtualLookup const& requiredLookup = *_modifierInvocation.name().annotation().requiredLookup;
 
-		functionReferenced(*modifier);
+		if (requiredLookup == VirtualLookup::Virtual)
+			functionReferenced(modifier->resolveVirtual(m_graph.contract));
+		else
+		{
+			solAssert(requiredLookup == VirtualLookup::Static, "");
+			functionReferenced(*modifier);
+		}
 	}
 }
 
@@ -246,6 +244,8 @@ void FunctionCallGraphBuilder::processQueue()
 	while (!m_visitQueue.empty())
 	{
 		m_currentNode = m_visitQueue.front();
+		solAssert(holds_alternative<CallableDeclaration const*>(m_currentNode), "");
+
 		m_visitQueue.pop_front();
 		get<CallableDeclaration const*>(m_currentNode)->accept(*this);
 	}
