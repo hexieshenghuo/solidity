@@ -40,12 +40,15 @@
 
 #include <liblangutil/SourceReferenceFormatter.h>
 
+#include <range/v3/view/map.hpp>
+
 #include <boost/range/adaptor/map.hpp>
 
 #include <sstream>
 #include <variant>
 
 using namespace std;
+using namespace ranges;
 using namespace solidity;
 using namespace solidity::util;
 using namespace solidity::frontend;
@@ -74,25 +77,16 @@ void verifyCallGraph(
 	);
 }
 
-void collectReachableCallables(
-	FunctionCallGraphBuilder::ContractCallGraph const& _graph,
-	FunctionCallGraphBuilder::Node _root,
-	set<CallableDeclaration const*, ASTNode::CompareByID>& o_reachableCallables
+set<CallableDeclaration const*, ASTNode::CompareByID> collectReachableCallables(
+	FunctionCallGraphBuilder::ContractCallGraph const& _graph
 )
 {
-	using Node = FunctionCallGraphBuilder::Node;
+	set<CallableDeclaration const*, ASTNode::CompareByID> reachableCallables;
+	for (FunctionCallGraphBuilder::Node const& reachableNode: _graph.edges | views::keys)
+		if (holds_alternative<CallableDeclaration const*>(reachableNode))
+			reachableCallables.emplace(get<CallableDeclaration const*>(reachableNode));
 
-	set<Node const*> reachableNodes = BreadthFirstSearch<Node const*>{{&_root}}.run(
-		[&_graph](Node const* _node, auto&& _addChild) {
-			set<Node, FunctionCallGraphBuilder::CompareByID> emptySet;
-			for (Node const& _child: valueOrDefault(_graph.edges, *_node, emptySet))
-				_addChild(&_child);
-		}
-	).visited;
-
-	for (Node const* reachableNode: reachableNodes)
-		if (holds_alternative<CallableDeclaration const*>(*reachableNode))
-			o_reachableCallables.emplace(get<CallableDeclaration const*>(*reachableNode));
+	return reachableCallables;
 }
 
 }
@@ -130,20 +124,13 @@ void IRGenerator::verifyCallGraphs(
 	FunctionCallGraphBuilder::ContractCallGraph const& _deployedGraph
 )
 {
-	set<CallableDeclaration const*, ASTNode::CompareByID> reachableCallables;
-
 	// m_creationFunctionList and m_deployedFunctionList are not used for any other purpose so
 	// we can just destroy them without bothering to make a copy.
 
-	collectReachableCallables(_creationGraph, FunctionCallGraphBuilder::SpecialNode::Entry, reachableCallables);
-	collectReachableCallables(_creationGraph, FunctionCallGraphBuilder::SpecialNode::InternalDispatch, reachableCallables);
-	verifyCallGraph(reachableCallables, move(m_creationFunctionList));
+	verifyCallGraph(collectReachableCallables(_creationGraph), move(m_creationFunctionList));
 	m_creationFunctionList = {};
 
-	reachableCallables.clear();
-	collectReachableCallables(_deployedGraph, FunctionCallGraphBuilder::SpecialNode::Entry, reachableCallables);
-	collectReachableCallables(_deployedGraph, FunctionCallGraphBuilder::SpecialNode::InternalDispatch, reachableCallables);
-	verifyCallGraph(reachableCallables, move(m_deployedFunctionList));
+	verifyCallGraph(collectReachableCallables(_deployedGraph), move(m_deployedFunctionList));
 	m_deployedFunctionList = {};
 }
 
