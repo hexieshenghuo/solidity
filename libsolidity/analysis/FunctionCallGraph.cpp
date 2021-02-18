@@ -176,14 +176,6 @@ bool FunctionCallGraphBuilder::visit(Identifier const& _identifier)
 	return true;
 }
 
-bool FunctionCallGraphBuilder::visit(NewExpression const& _newExpression)
-{
-	if (ContractType const* contractType = dynamic_cast<ContractType const*>(_newExpression.typeName().annotation().type))
-		m_graph.createdContracts.emplace(&contractType->contractDefinition());
-
-	return true;
-}
-
 bool FunctionCallGraphBuilder::visit(MemberAccess const& _memberAccess)
 {
 	auto functionType = dynamic_cast<FunctionType const*>(_memberAccess.annotation().type);
@@ -226,6 +218,14 @@ bool FunctionCallGraphBuilder::visit(ModifierInvocation const& _modifierInvocati
 			functionReferenced(*modifier);
 		}
 	}
+
+	return true;
+}
+
+bool FunctionCallGraphBuilder::visit(NewExpression const& _newExpression)
+{
+	if (ContractType const* contractType = dynamic_cast<ContractType const*>(_newExpression.typeName().annotation().type))
+		m_graph.createdContracts.emplace(&contractType->contractDefinition());
 
 	return true;
 }
