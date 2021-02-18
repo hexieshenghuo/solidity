@@ -184,12 +184,12 @@ bool FunctionCallGraphBuilder::visit(NewExpression const& _newExpression)
 	return true;
 }
 
-void FunctionCallGraphBuilder::endVisit(MemberAccess const& _memberAccess)
+bool FunctionCallGraphBuilder::visit(MemberAccess const& _memberAccess)
 {
 	auto functionType = dynamic_cast<FunctionType const*>(_memberAccess.annotation().type);
 	auto functionDef = dynamic_cast<FunctionDefinition const*>(_memberAccess.annotation().referencedDeclaration);
 	if (!functionType || !functionDef || functionType->kind() != FunctionType::Kind::Internal)
-		return;
+		return true;
 
 	// Super functions
 	if (*_memberAccess.annotation().requiredLookup == VirtualLookup::Super)
@@ -208,9 +208,11 @@ void FunctionCallGraphBuilder::endVisit(MemberAccess const& _memberAccess)
 		solAssert(*_memberAccess.annotation().requiredLookup == VirtualLookup::Static, "");
 
 	functionReferenced(*functionDef, _memberAccess.annotation().calledDirectly);
+
+	return true;
 }
 
-void FunctionCallGraphBuilder::endVisit(ModifierInvocation const& _modifierInvocation)
+bool FunctionCallGraphBuilder::visit(ModifierInvocation const& _modifierInvocation)
 {
 	if (auto const* modifier = dynamic_cast<ModifierDefinition const*>(_modifierInvocation.name().annotation().referencedDeclaration))
 	{
@@ -224,6 +226,8 @@ void FunctionCallGraphBuilder::endVisit(ModifierInvocation const& _modifierInvoc
 			functionReferenced(*modifier);
 		}
 	}
+
+	return true;
 }
 
 void FunctionCallGraphBuilder::enqueueCallable(CallableDeclaration const& _callable)

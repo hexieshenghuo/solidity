@@ -107,8 +107,8 @@ private:
 	bool visit(EmitStatement const& _emitStatement) override;
 	bool visit(Identifier const& _identifier) override;
 	bool visit(NewExpression const& _newExpression) override;
-	void endVisit(MemberAccess const& _memberAccess) override;
-	void endVisit(ModifierInvocation const& _modifierInvocation) override;
+	bool visit(MemberAccess const& _memberAccess) override;
+	bool visit(ModifierInvocation const& _modifierInvocation) override;
 
 	void enqueueCallable(CallableDeclaration const& _callable);
 	void processQueue();
