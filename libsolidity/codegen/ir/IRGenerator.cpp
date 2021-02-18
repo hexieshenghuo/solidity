@@ -84,7 +84,8 @@ void collectReachableCallables(
 
 	set<Node const*> reachableNodes = BreadthFirstSearch<Node const*>{{&_root}}.run(
 		[&_graph](Node const* _node, auto&& _addChild) {
-			for (Node const& _child: valueOrDefault(_graph.edges, *_node, {}))
+			set<Node, FunctionCallGraphBuilder::CompareByID> emptySet;
+			for (Node const& _child: valueOrDefault(_graph.edges, *_node, emptySet))
 				_addChild(&_child);
 		}
 	).visited;
