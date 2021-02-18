@@ -408,7 +408,7 @@ bool CompilerStack::analyze()
 						{
 							Contract& contractState = m_contracts.at(contractDefinition->fullyQualifiedName());
 							contractState.creationCallGraph = FunctionCallGraphBuilder::buildCreationGraph(*contractDefinition);
-							contractState.deploymentCallGraph = FunctionCallGraphBuilder::buildDeploymentGraph(*contractDefinition, *contractState.creationCallGraph);
+							contractState.deployedCallGraph = FunctionCallGraphBuilder::buildDeployedGraph(*contractDefinition, *contractState.creationCallGraph);
 						}
 		}
 
@@ -959,13 +959,13 @@ FunctionCallGraphBuilder::ContractCallGraph const& CompilerStack::creationCallGr
 	return *contract(_contractName).creationCallGraph;
 }
 
-FunctionCallGraphBuilder::ContractCallGraph const& CompilerStack::deploymentCallGraph(string const& _contractName) const
+FunctionCallGraphBuilder::ContractCallGraph const& CompilerStack::deployedCallGraph(string const& _contractName) const
 {
 	if (m_stackState < AnalysisPerformed)
 		BOOST_THROW_EXCEPTION(CompilerError() << errinfo_comment("Analysis was not successful."));
 
-	solAssert(contract(_contractName).deploymentCallGraph != nullptr, "");
-	return *contract(_contractName).deploymentCallGraph;
+	solAssert(contract(_contractName).deployedCallGraph != nullptr, "");
+	return *contract(_contractName).deployedCallGraph;
 }
 
 Scanner const& CompilerStack::scanner(string const& _sourceName) const
@@ -1307,7 +1307,7 @@ void CompilerStack::generateIR(ContractDefinition const& _contract)
 	IRGenerator generator(m_evmVersion, m_revertStrings, m_optimiserSettings);
 	tie(compiledContract.yulIR, compiledContract.yulIROptimized) = generator.run(_contract, otherYulSources);
 
-	generator.verifyCallGraphs(*compiledContract.creationCallGraph, *compiledContract.deploymentCallGraph);
+	generator.verifyCallGraphs(*compiledContract.creationCallGraph, *compiledContract.deployedCallGraph);
 }
 
 void CompilerStack::generateEVMFromIR(ContractDefinition const& _contract)
