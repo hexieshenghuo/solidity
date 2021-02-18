@@ -93,7 +93,7 @@ public:
 	};
 
 	static std::unique_ptr<ContractCallGraph> buildCreationGraph(ContractDefinition const& _contract);
-	static std::unique_ptr<ContractCallGraph> buildDeploymentGraph(
+	static std::unique_ptr<ContractCallGraph> buildDeployedGraph(
 		ContractDefinition const& _contract,
 		FunctionCallGraphBuilder::ContractCallGraph const& _creationGraph
 	);

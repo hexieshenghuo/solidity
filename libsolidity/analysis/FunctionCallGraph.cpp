@@ -80,7 +80,7 @@ unique_ptr<FunctionCallGraphBuilder::ContractCallGraph> FunctionCallGraphBuilder
 	return make_unique<FunctionCallGraphBuilder::ContractCallGraph>(std::move(builder.m_graph));
 }
 
-unique_ptr<FunctionCallGraphBuilder::ContractCallGraph> FunctionCallGraphBuilder::buildDeploymentGraph(
+unique_ptr<FunctionCallGraphBuilder::ContractCallGraph> FunctionCallGraphBuilder::buildDeployedGraph(
 	ContractDefinition const& _contract,
 	FunctionCallGraphBuilder::ContractCallGraph const& _creationGraph
 )
