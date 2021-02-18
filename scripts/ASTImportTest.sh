@@ -84,7 +84,7 @@ echo "Looking at $NSOURCES .sol files..."
 WORKINGDIR=$PWD
 
 # for solfile in $(find $DEV_DIR -name *.sol)
-for solfile in $(find "$SYNTAXTESTS_DIR" "$ASTJSONTESTS_DIR" -name *.sol)
+for solfile in $(find "$SYNTAXTESTS_DIR" "$ASTJSONTESTS_DIR" -name *.sol -and -not -name "boost_filesystem_bug.sol")
 do
     echo -n "."
     # create a temporary sub-directory
