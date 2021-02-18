@@ -53,7 +53,9 @@ namespace solidity::frontend
  *  Auto-generated getter functions for public state variables are ignored, but function calls
  *  inside initial assignments are included in the creation graph.
  *
- *  Only calls reachable from an Entry node are included in the graph.
+ *  Only calls reachable from an Entry node are included in the graph. The map representing edges
+ *  is also guaranteed to contain keys representing all the reachable functions and modifiers, even
+ *  if they have no outgoing edges.
  */
 class FunctionCallGraphBuilder: private ASTConstVisitor
 {
